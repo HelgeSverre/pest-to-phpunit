@@ -1,0 +1,435 @@
+<?php
+
+declare(strict_types=1);
+
+namespace HelgeSverre\PestToPhpUnit\Helper;
+
+use HelgeSverre\PestToPhpUnit\Mapping\ExpectationMethodMap;
+use PhpParser\Comment;
+use PhpParser\Node;
+use PhpParser\Node\Arg;
+use PhpParser\Node\Expr;
+use PhpParser\Node\Expr\ClassConstFetch;
+use PhpParser\Node\Expr\FuncCall;
+use PhpParser\Node\Expr\MethodCall;
+use PhpParser\Node\Expr\PropertyFetch;
+use PhpParser\Node\Expr\Variable;
+use PhpParser\Node\Identifier;
+use PhpParser\Node\Name;
+use PhpParser\Node\Name\FullyQualified;
+use PhpParser\Node\Stmt;
+use PhpParser\Node\Stmt\Nop;
+
+final class ExpectChainUnwinder
+{
+    /**
+     * Given an expression that might be an expect() chain,
+     * returns an array of PHPUnit assertion statement nodes,
+     * or null if this is not an expect chain.
+     *
+     * @return list<Stmt>|null
+     */
+    public static function unwind(Expr $expr): ?array
+    {
+        $segments = self::flattenChain($expr);
+
+        if ($segments === null) {
+            return null;
+        }
+
+        return self::segmentsToStatements($segments);
+    }
+
+    /**
+     * Flatten the chain into a list of groups, each starting with a subject.
+     * Returns null if the root is not an expect() call.
+     *
+     * @return list<array{subject: Expr, parts: list<array{type: string, name: string, args: list<Arg>}>}>|null
+     */
+    private static function flattenChain(Expr $expr): ?array
+    {
+        $parts = [];
+        $current = $expr;
+
+        // Walk the chain from outer to inner, collecting segments
+        while (true) {
+            if ($current instanceof MethodCall) {
+                $name = $current->name instanceof Identifier ? $current->name->name : null;
+                if ($name === null) {
+                    return null;
+                }
+
+                $args = [];
+                foreach ($current->args as $arg) {
+                    if ($arg instanceof Arg) {
+                        $args[] = $arg;
+                    }
+                }
+
+                $parts[] = ['type' => 'method', 'name' => $name, 'args' => $args];
+                $current = $current->var;
+            } elseif ($current instanceof PropertyFetch) {
+                $name = $current->name instanceof Identifier ? $current->name->name : null;
+                if ($name === null) {
+                    return null;
+                }
+
+                $parts[] = ['type' => 'property', 'name' => $name, 'args' => []];
+                $current = $current->var;
+            } elseif ($current instanceof FuncCall) {
+                $funcName = $current->name instanceof Name ? $current->name->toString() : null;
+                if ($funcName !== 'expect') {
+                    return null;
+                }
+
+                $subject = $current->args[0] ?? null;
+                $subjectExpr = ($subject instanceof Arg) ? $subject->value : null;
+                if ($subjectExpr === null) {
+                    return null;
+                }
+
+                // Reverse parts since we walked from outer to inner
+                $parts = array_reverse($parts);
+
+                return self::splitByAnd($subjectExpr, $parts);
+            } else {
+                return null;
+            }
+        }
+    }
+
+    /**
+     * Split a linear chain of parts into groups separated by and() calls.
+     *
+     * @param list<array{type: string, name: string, args: list<Arg>}> $parts
+     * @return list<array{subject: Expr, parts: list<array{type: string, name: string, args: list<Arg>}>}>
+     */
+    private static function splitByAnd(Expr $initialSubject, array $parts): array
+    {
+        $groups = [];
+        $currentSubject = $initialSubject;
+        $currentParts = [];
+
+        foreach ($parts as $part) {
+            if ($part['name'] === 'and' && $part['type'] === 'method') {
+                // Flush current group
+                $groups[] = ['subject' => $currentSubject, 'parts' => $currentParts];
+                $currentSubject = $part['args'][0]->value ?? new Variable('undefined');
+                $currentParts = [];
+            } else {
+                $currentParts[] = $part;
+            }
+        }
+
+        $groups[] = ['subject' => $currentSubject, 'parts' => $currentParts];
+
+        return $groups;
+    }
+
+    /**
+     * @param list<array{subject: Expr, parts: list<array{type: string, name: string, args: list<Arg>}>}> $groups
+     * @return list<Stmt>
+     */
+    private static function segmentsToStatements(array $groups): array
+    {
+        $stmts = [];
+
+        foreach ($groups as $group) {
+            $groupStmts = self::processGroup($group['subject'], $group['parts']);
+            array_push($stmts, ...$groupStmts);
+        }
+
+        return $stmts;
+    }
+
+    /**
+     * @param list<array{type: string, name: string, args: list<Arg>}> $parts
+     * @return list<Stmt>
+     */
+    private static function processGroup(Expr $subject, array $parts): array
+    {
+        $stmts = [];
+        $negated = false;
+        $eachMode = false;
+        $currentSubject = $subject;
+
+        foreach ($parts as $part) {
+            $name = $part['name'];
+            $args = $part['args'];
+
+            if ($name === 'not') {
+                $negated = true;
+                continue;
+            }
+
+            if ($name === 'each') {
+                $eachMode = true;
+                continue;
+            }
+
+            if ($name === 'sequence' || $name === 'json' || $name === 'defer' || $name === 'ray') {
+                // Skip unsupported modifiers
+                continue;
+            }
+
+            // Check if this is a terminal (assertion)
+            $mapping = ExpectationMethodMap::getMapping($name);
+            if ($mapping !== null) {
+                [$phpunitMethod, $argOrder] = $mapping;
+
+                if ($negated) {
+                    $phpunitMethod = ExpectationMethodMap::getNegated($phpunitMethod) ?? $phpunitMethod;
+                    $negated = false;
+                }
+
+                if ($eachMode) {
+                    $stmts[] = self::buildEachAssertion($currentSubject, $phpunitMethod, $argOrder, $args);
+                    // Don't reset eachMode - it applies to subsequent assertions too
+                } else {
+                    $stmts[] = self::buildAssertion($currentSubject, $phpunitMethod, $argOrder, $args);
+                }
+
+                continue;
+            }
+
+            if ($name === 'toThrow') {
+                $throwStmts = self::buildToThrow($currentSubject, $args, $negated);
+                array_push($stmts, ...$throwStmts);
+                $negated = false;
+                continue;
+            }
+
+            if ($name === 'toMatchArray') {
+                $phpunitMethod = $negated ? 'assertNotEquals' : 'assertEquals';
+                $negated = false;
+                $stmts[] = self::buildAssertion($currentSubject, $phpunitMethod, 'expected_actual', $args);
+                continue;
+            }
+
+            if ($name === 'toHaveProperty' || $name === 'toHaveProperties') {
+                // toHaveProperty($name, $value?) → assertTrue(property_exists(...)) or assertSame for value check
+                // Just emit a comment-based assertion for complex cases
+                $phpunitMethod = $negated ? 'assertObjectNotHasProperty' : 'assertObjectHasProperty';
+                $negated = false;
+                if (count($args) >= 1) {
+                    $stmts[] = self::buildAssertion($currentSubject, $phpunitMethod, 'expected_actual', [$args[0]]);
+                }
+                continue;
+            }
+
+            if ($name === 'toHaveKeys') {
+                // toHaveKeys(['a', 'b']) → multiple assertArrayHasKey calls
+                $phpunitMethod = $negated ? 'assertArrayNotHasKey' : 'assertArrayHasKey';
+                $negated = false;
+                if (count($args) >= 1 && $args[0]->value instanceof \PhpParser\Node\Expr\Array_) {
+                    foreach ($args[0]->value->items as $item) {
+                        if ($item !== null) {
+                            $stmts[] = self::buildAssertion($currentSubject, $phpunitMethod, 'expected_actual', [new Arg($item->value)]);
+                        }
+                    }
+                }
+                continue;
+            }
+
+            if ($name === 'toContainOnlyInstancesOf') {
+                $phpunitMethod = 'assertContainsOnlyInstancesOf';
+                if ($negated) {
+                    $negated = false;
+                }
+                $stmts[] = self::buildAssertion($currentSubject, $phpunitMethod, 'expected_actual', $args);
+                continue;
+            }
+
+            if ($name === 'toBeBetween') {
+                // expect($x)->toBeBetween(1, 10)
+                if (count($args) >= 2) {
+                    $gte = $negated ? 'assertLessThan' : 'assertGreaterThanOrEqual';
+                    $lte = $negated ? 'assertGreaterThan' : 'assertLessThanOrEqual';
+                    $negated = false;
+                    $stmts[] = self::buildAssertion($currentSubject, $gte, 'expected_actual', [$args[0]]);
+                    $stmts[] = self::buildAssertion($currentSubject, $lte, 'expected_actual', [$args[1]]);
+                }
+                continue;
+            }
+
+            if ($name === 'toHaveMethod' || $name === 'toHaveMethods') {
+                // Skip - no direct PHPUnit equivalent, emit assertTrue with method_exists
+                $phpunitMethod = $negated ? 'assertFalse' : 'assertTrue';
+                $negated = false;
+                if (count($args) >= 1) {
+                    $methodExistsCall = new FuncCall(
+                        new Name('method_exists'),
+                        [new Arg($currentSubject), $args[0]]
+                    );
+                    $stmts[] = new Stmt\Expression(
+                        new MethodCall(
+                            new Variable('this'),
+                            $phpunitMethod,
+                            [new Arg($methodExistsCall)]
+                        )
+                    );
+                }
+                continue;
+            }
+
+            // Laravel-specific expectations with reasonable PHPUnit mappings
+            $laravelMappings = [
+                'toBeCollection' => '\\Illuminate\\Support\\Collection',
+                'toBeModel' => '\\Illuminate\\Database\\Eloquent\\Model',
+                'toBeEloquentCollection' => '\\Illuminate\\Database\\Eloquent\\Collection',
+            ];
+
+            if (isset($laravelMappings[$name])) {
+                $phpunitMethod = $negated ? 'assertNotInstanceOf' : 'assertInstanceOf';
+                $negated = false;
+                $classArg = new Arg(new ClassConstFetch(new FullyQualified(ltrim($laravelMappings[$name], '\\')), new Identifier('class')));
+                $stmts[] = self::buildAssertion($currentSubject, $phpunitMethod, 'expected_actual', [$classArg]);
+                continue;
+            }
+
+            // Unknown terminal expectation (starts with 'to') — emit TODO instead of silently treating as accessor
+            if ($part['type'] === 'method' && str_starts_with($name, 'to') && !ExpectationMethodMap::isModifier($name)) {
+                $comment = new Nop();
+                $comment->setAttribute('comments', [new Comment("// TODO(Pest): Unknown expectation ->{$name}() has no PHPUnit equivalent")]);
+                $stmts[] = $comment;
+                $negated = false;
+                continue;
+            }
+
+            // If it's a property access (accessor), apply it to the subject
+            if ($part['type'] === 'property') {
+                $currentSubject = new PropertyFetch($currentSubject, new Identifier($name));
+                continue;
+            }
+
+            // If it's an unknown method call, treat it as a property accessor via method
+            // (e.g., ->count() on collections)
+            if ($part['type'] === 'method' && ! ExpectationMethodMap::isModifier($name)) {
+                $currentSubject = new MethodCall($currentSubject, new Identifier($name), $args);
+                continue;
+            }
+        }
+
+        return $stmts;
+    }
+
+    /**
+     * Build a PHPUnit assertion statement.
+     *
+     * @param list<Arg> $terminalArgs
+     */
+    private static function buildAssertion(Expr $subject, string $phpunitMethod, string $argOrder, array $terminalArgs): Stmt\Expression
+    {
+        $assertArgs = self::buildAssertArgs($subject, $argOrder, $terminalArgs);
+
+        return new Stmt\Expression(
+            new MethodCall(
+                new Variable('this'),
+                $phpunitMethod,
+                $assertArgs
+            )
+        );
+    }
+
+    /**
+     * @param list<Arg> $terminalArgs
+     * @return list<Arg>
+     */
+    private static function buildAssertArgs(Expr $subject, string $argOrder, array $terminalArgs): array
+    {
+        if ($argOrder === 'actual_only') {
+            return [new Arg($subject)];
+        }
+
+        // expected_actual: first terminal arg is expected, subject is actual
+        $args = [];
+        if (count($terminalArgs) > 0) {
+            $args[] = $terminalArgs[0];
+        }
+        $args[] = new Arg($subject);
+
+        // Pass any remaining args
+        for ($i = 1; $i < count($terminalArgs); $i++) {
+            $args[] = $terminalArgs[$i];
+        }
+
+        return $args;
+    }
+
+    /**
+     * Build a foreach loop for ->each assertions.
+     *
+     * @param list<Arg> $terminalArgs
+     */
+    private static function buildEachAssertion(Expr $subject, string $phpunitMethod, string $argOrder, array $terminalArgs): Stmt\Foreach_
+    {
+        $itemVar = new Variable('__each_item');
+        $assertArgs = self::buildAssertArgs($itemVar, $argOrder, $terminalArgs);
+
+        $assertStmt = new Stmt\Expression(
+            new MethodCall(
+                new Variable('this'),
+                $phpunitMethod,
+                $assertArgs
+            )
+        );
+
+        return new Stmt\Foreach_(
+            $subject,
+            $itemVar,
+            [
+                'stmts' => [$assertStmt],
+            ]
+        );
+    }
+
+    /**
+     * Build toThrow() assertion.
+     *
+     * @param list<Arg> $args
+     * @return list<Stmt>
+     */
+    private static function buildToThrow(Expr $callable, array $args, bool $negated): array
+    {
+        $stmts = [];
+
+        if ($negated) {
+            // Wrap in try/catch, fail if exception thrown
+            $callStmt = new Stmt\Expression(
+                new FuncCall($callable)
+            );
+            $stmts[] = $callStmt;
+
+            return $stmts;
+        }
+
+        // expectException
+        if (count($args) >= 1) {
+            $stmts[] = new Stmt\Expression(
+                new MethodCall(
+                    new Variable('this'),
+                    'expectException',
+                    [$args[0]]
+                )
+            );
+        }
+
+        // expectExceptionMessage (second arg)
+        if (count($args) >= 2) {
+            $stmts[] = new Stmt\Expression(
+                new MethodCall(
+                    new Variable('this'),
+                    'expectExceptionMessage',
+                    [$args[1]]
+                )
+            );
+        }
+
+        // Invoke the callable
+        $stmts[] = new Stmt\Expression(
+            new FuncCall($callable)
+        );
+
+        return $stmts;
+    }
+}

@@ -1,0 +1,54 @@
+{
+    "name": "helgesverre/pest-to-phpunit",
+    "description": "Rector rules to convert Pest tests to PHPUnit",
+    "type": "rector-extension",
+    "license": "MIT",
+    "keywords": [
+        "rector",
+        "pest",
+        "phpunit",
+        "testing",
+        "migration",
+        "conversion"
+    ],
+    "homepage": "https://github.com/HelgeSverre/pest-to-phpunit",
+    "authors": [
+        {
+            "name": "Helge Sverre",
+            "email": "helge.sverre@gmail.com",
+            "homepage": "https://helgesver.re",
+            "role": "Developer"
+        }
+    ],
+    "support": {
+        "issues": "https://github.com/HelgeSverre/pest-to-phpunit/issues",
+        "source": "https://github.com/HelgeSverre/pest-to-phpunit"
+    },
+    "require": {
+        "php": "^8.1",
+        "rector/rector": "^2.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.5|^11.0",
+        "phpstan/phpstan": "^2.0",
+        "symplify/easy-coding-standard": "^12.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "HelgeSverre\\PestToPhpUnit\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "HelgeSverre\\PestToPhpUnit\\Tests\\": "tests/"
+        }
+    },
+    "minimum-stability": "dev",
+    "prefer-stable": true,
+    "config": {
+        "sort-packages": true
+    },
+    "scripts": {
+        "test": "phpunit --no-coverage"
+    }
+}

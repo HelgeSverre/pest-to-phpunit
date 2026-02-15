@@ -3,3 +3,13 @@ composer.lock
 .phpunit.result.cache
 .phpunit.cache/
 /.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+*.swp
+*.swo
+*~
+.vscode/
