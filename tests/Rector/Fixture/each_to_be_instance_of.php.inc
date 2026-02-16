@@ -9,8 +9,8 @@ class EachToBeInstanceOfTest extends \PHPUnit\Framework\TestCase
 {
     public function test_each_instanceof(): void
     {
-        foreach ($users as $__each_item) {
-            $this->assertInstanceOf(User::class, $__each_item);
+        foreach ($users as $__pest_each_item) {
+            $this->assertInstanceOf(User::class, $__pest_each_item);
         }
     }
 }

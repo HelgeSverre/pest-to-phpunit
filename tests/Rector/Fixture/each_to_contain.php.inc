@@ -9,8 +9,8 @@ class EachToContainTest extends \PHPUnit\Framework\TestCase
 {
     public function test_each_tocontain(): void
     {
-        foreach (['hello world', 'hello there'] as $__each_item) {
-            $this->assertContains('hello', $__each_item);
+        foreach (['hello world', 'hello there'] as $__pest_each_item) {
+            $this->assertContains('hello', $__pest_each_item);
         }
     }
 }

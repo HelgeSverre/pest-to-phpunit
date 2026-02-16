@@ -11,8 +11,8 @@ class EachModifierTest extends \PHPUnit\Framework\TestCase
 {
     public function test_each_modifier(): void
     {
-        foreach ($items as $__each_item) {
-            $this->assertIsString($__each_item);
+        foreach ($items as $__pest_each_item) {
+            $this->assertIsString($__pest_each_item);
         }
     }
 }

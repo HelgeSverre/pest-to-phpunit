@@ -11,6 +11,6 @@ class ToHaveLengthNegatedTest extends \PHPUnit\Framework\TestCase
 {
     public function test_not_length(): void
     {
-        $this->assertNotCount(3, [1, 2]);
+        $this->assertNotSame(3, is_string([1, 2]) ? strlen([1, 2]) : count([1, 2]));
     }
 }

@@ -8,8 +8,8 @@ class EachToEqualTest extends \PHPUnit\Framework\TestCase
 {
     public function test_each_equal(): void
     {
-        foreach ($items as $__each_item) {
-            $this->assertEquals('expected', $__each_item);
+        foreach ($items as $__pest_each_item) {
+            $this->assertEquals('expected', $__pest_each_item);
         }
     }
 }

@@ -870,6 +870,8 @@ CODE_SAMPLE,
         // Collect describe-scoped beforeEach/afterEach hooks
         $localBeforeEach = [];
         $localAfterEach = [];
+        $localBeforeAllFound = false;
+        $localAfterAllFound = false;
 
         foreach ($closure->stmts as $stmt) {
             if (! $stmt instanceof Expression) {
@@ -900,12 +902,28 @@ CODE_SAMPLE,
                 } elseif ($closureHookArg instanceof ArrowFunction) {
                     $localAfterEach[] = new Expression($closureHookArg->expr);
                 }
+            } elseif ($fn === 'beforeAll') {
+                $localBeforeAllFound = true;
+            } elseif ($fn === 'afterAll') {
+                $localAfterAllFound = true;
             }
         }
 
         // Merge with inherited scoped hooks (outer first, then inner)
         $mergedBeforeEach = array_merge($scopedBeforeEach, $localBeforeEach);
         $mergedAfterEach = array_merge($scopedAfterEach, $localAfterEach);
+
+        $scopedTodos = [];
+        if ($localBeforeAllFound) {
+            $nop = new Nop();
+            $nop->setAttribute('comments', [new Comment('// TODO(Pest): beforeAll() inside describe() cannot be scoped in PHPUnit — move to setUpBeforeClass() or inline')]);
+            $scopedTodos[] = $nop;
+        }
+        if ($localAfterAllFound) {
+            $nop = new Nop();
+            $nop->setAttribute('comments', [new Comment('// TODO(Pest): afterAll() inside describe() cannot be scoped in PHPUnit — move to tearDownAfterClass() or inline')]);
+            $scopedTodos[] = $nop;
+        }
 
         foreach ($closure->stmts as $stmt) {
             if (! $stmt instanceof Expression) {
@@ -929,14 +947,14 @@ CODE_SAMPLE,
 
             if ($funcName === 'test' || $funcName === 'it') {
                 $mergedModifiers = array_merge($describeModifiers, $chainModifiers);
-                $result = $this->processTestCall($rootCall, $funcName, $mergedModifiers, $dataProviders, $providerCounter, $prefix, $mergedBeforeEach, $mergedAfterEach);
+                $result = $this->processTestCall($rootCall, $funcName, $mergedModifiers, $dataProviders, $providerCounter, $prefix, array_merge($scopedTodos, $mergedBeforeEach), $mergedAfterEach);
                 if ($result !== null) {
                     $results[] = $result;
                     $providerCounter = $result['providerCounter'];
                 }
             } elseif ($funcName === 'describe') {
                 $nestedModifiers = array_merge($describeModifiers, $chainModifiers);
-                $nestedResults = $this->processDescribe($rootCall, $prefix, $dataProviders, $providerCounter, $nestedModifiers, $mergedBeforeEach, $mergedAfterEach);
+                $nestedResults = $this->processDescribe($rootCall, $prefix, $dataProviders, $providerCounter, $nestedModifiers, array_merge($scopedTodos, $mergedBeforeEach), $mergedAfterEach);
                 foreach ($nestedResults as $nr) {
                     $results[] = $nr;
                     $providerCounter = $nr['providerCounter'];

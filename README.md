@@ -49,6 +49,14 @@ vendor/bin/rector process tests
 vendor/bin/rector process tests/Feature
 ```
 
+### 3. Review TODO comments
+
+Some Pest features cannot be auto-converted and will be marked with `// TODO(Pest):` comments. After running Rector, search for these to find anything that needs manual attention:
+
+```bash
+grep -rn "TODO(Pest)" tests/
+```
+
 ## Examples
 
 ### Basic `test()` / `it()`

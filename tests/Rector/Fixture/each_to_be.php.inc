@@ -9,8 +9,8 @@ class EachToBeTest extends \PHPUnit\Framework\TestCase
 {
     public function test_each_tobe(): void
     {
-        foreach ([1, 1, 1] as $__each_item) {
-            $this->assertSame(1, $__each_item);
+        foreach ([1, 1, 1] as $__pest_each_item) {
+            $this->assertSame(1, $__pest_each_item);
         }
     }
 }

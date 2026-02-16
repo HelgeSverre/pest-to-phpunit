@@ -54,7 +54,6 @@ final class ExpectationMethodMap
         'toBeFinite' => ['assertIsFinite', 'actual_only'],
         'toBeInfinite' => ['assertIsInfinite', 'actual_only'],
         'toBeJson' => ['assertJson', 'actual_only'],
-        'toHaveLength' => ['assertCount', 'expected_actual'],
         'toBeList' => ['assertIsList', 'actual_only'],
         'toHaveSameSize' => ['assertSameSize', 'expected_actual'],
         'toContainEqual' => ['assertContainsEquals', 'expected_actual'],
@@ -96,7 +95,6 @@ final class ExpectationMethodMap
         'assertArrayHasKey' => 'assertArrayNotHasKey',
         'assertFileExists' => 'assertFileDoesNotExist',
         'assertDirectoryExists' => 'assertDirectoryDoesNotExist',
-        'assertJson' => 'assertIsNotString', // no direct negation, fallback
         'assertEqualsCanonicalizing' => 'assertNotEqualsCanonicalizing',
         'assertEqualsWithDelta' => 'assertNotEqualsWithDelta',
         'assertSameSize' => 'assertNotSameSize',

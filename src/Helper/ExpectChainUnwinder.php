@@ -11,6 +11,7 @@ use PhpParser\Node\Arg;
 use PhpParser\Node\Expr;
 use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\FuncCall;
+use PhpParser\Node\Expr\Ternary;
 use PhpParser\Node\Expr\MethodCall;
 use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\Variable;
@@ -23,6 +24,8 @@ use PhpParser\Node\Stmt\Nop;
 
 final class ExpectChainUnwinder
 {
+    private const EACH_ITEM_VAR = '__pest_each_item';
+
     /**
      * Given an expression that might be an expect() chain,
      * returns an array of PHPUnit assertion statement nodes,
@@ -194,10 +197,39 @@ final class ExpectChainUnwinder
             }
 
             if ($name === 'tap') {
-                if (count($args) >= 1 && $args[0]->value instanceof \PhpParser\Node\Expr\Closure) {
-                    $tapClosure = $args[0]->value;
-                    foreach ($tapClosure->stmts as $tapStmt) {
-                        $stmts[] = $tapStmt;
+                if (count($args) >= 1) {
+                    $tapCallable = $args[0]->value;
+                    $tapParams = [];
+                    $tapBody = [];
+
+                    if ($tapCallable instanceof \PhpParser\Node\Expr\Closure) {
+                        $tapParams = $tapCallable->params;
+                        $tapBody = $tapCallable->stmts;
+                    } elseif ($tapCallable instanceof \PhpParser\Node\Expr\ArrowFunction) {
+                        $tapParams = $tapCallable->params;
+                        $tapBody = [new Stmt\Expression($tapCallable->expr)];
+                    }
+
+                    if (count($tapParams) >= 1) {
+                        $paramName = $tapParams[0]->var->name;
+                        $stmts[] = new Stmt\Expression(
+                            new \PhpParser\Node\Expr\Assign(
+                                new Variable($paramName),
+                                $currentSubject
+                            )
+                        );
+                    }
+                    foreach ($tapBody as $tapStmt) {
+                        if ($tapStmt instanceof Stmt\Expression) {
+                            $unwound = self::unwind($tapStmt->expr);
+                            if ($unwound !== null) {
+                                array_push($stmts, ...$unwound);
+                            } else {
+                                $stmts[] = $tapStmt;
+                            }
+                        } else {
+                            $stmts[] = $tapStmt;
+                        }
                     }
                 }
                 continue;
@@ -238,13 +270,62 @@ final class ExpectChainUnwinder
                 continue;
             }
 
+            if ($name === 'toHaveLength') {
+                if (count($args) >= 1) {
+                    $lenExpr = new Ternary(
+                        new FuncCall(new Name('is_string'), [new Arg($currentSubject)]),
+                        new FuncCall(new Name('strlen'), [new Arg($currentSubject)]),
+                        new FuncCall(new Name('count'), [new Arg($currentSubject)])
+                    );
+                    $phpunitMethod = $negated ? 'assertNotSame' : 'assertSame';
+                    $negated = false;
+
+                    if ($eachMode) {
+                        $itemVar = new Variable(self::EACH_ITEM_VAR);
+                        $itemLenExpr = new Ternary(
+                            new FuncCall(new Name('is_string'), [new Arg($itemVar)]),
+                            new FuncCall(new Name('strlen'), [new Arg($itemVar)]),
+                            new FuncCall(new Name('count'), [new Arg($itemVar)])
+                        );
+                        $assertStmt = new Stmt\Expression(
+                            new MethodCall(new Variable('this'), $phpunitMethod, [
+                                $args[0],
+                                new Arg($itemLenExpr),
+                            ])
+                        );
+                        $stmts[] = new Stmt\Foreach_(
+                            $currentSubject,
+                            $itemVar,
+                            ['stmts' => [$assertStmt]]
+                        );
+                    } else {
+                        $stmts[] = new Stmt\Expression(
+                            new MethodCall(new Variable('this'), $phpunitMethod, [
+                                $args[0],
+                                new Arg($lenExpr),
+                            ])
+                        );
+                    }
+                }
+                continue;
+            }
+
             // Check if this is a terminal (assertion)
             $mapping = ExpectationMethodMap::getMapping($name);
             if ($mapping !== null) {
                 [$phpunitMethod, $argOrder] = $mapping;
 
                 if ($negated) {
-                    $phpunitMethod = ExpectationMethodMap::getNegated($phpunitMethod) ?? $phpunitMethod;
+                    $negatedMethod = ExpectationMethodMap::getNegated($phpunitMethod);
+                    if ($negatedMethod !== null) {
+                        $phpunitMethod = $negatedMethod;
+                    } else {
+                        $comment = new Nop();
+                        $comment->setAttribute('comments', [new Comment("// TODO(Pest): not->{$name}() has no direct PHPUnit equivalent")]);
+                        $stmts[] = $comment;
+                        $negated = false;
+                        continue;
+                    }
                     $negated = false;
                 }
 
@@ -433,13 +514,24 @@ final class ExpectChainUnwinder
                 continue;
             }
 
-            if ($name === 'toBeUppercase' || $name === 'toBeLowercase' || $name === 'toBeAlpha'
+            if ($name === 'toBeUppercase' || $name === 'toBeLowercase') {
+                $funcName_case = $name === 'toBeUppercase' ? 'strtoupper' : 'strtolower';
+                $phpunitMethod = $negated ? 'assertNotSame' : 'assertSame';
+                $negated = false;
+                $stmts[] = new Stmt\Expression(
+                    new MethodCall(new Variable('this'), $phpunitMethod, [
+                        new Arg(new FuncCall(new Name($funcName_case), [new Arg($currentSubject)])),
+                        new Arg($currentSubject),
+                    ])
+                );
+                continue;
+            }
+
+            if ($name === 'toBeAlpha'
                 || $name === 'toBeAlphaNumeric' || $name === 'toBeSnakeCase' || $name === 'toBeKebabCase'
                 || $name === 'toBeCamelCase' || $name === 'toBeStudlyCase' || $name === 'toBeUuid'
                 || $name === 'toBeUrl' || $name === 'toBeDigits') {
                 $regexMap = [
-                    'toBeUppercase' => '/^[^a-z]*$/',
-                    'toBeLowercase' => '/^[^A-Z]*$/',
                     'toBeAlpha' => '/^[a-zA-Z]+$/',
                     'toBeAlphaNumeric' => '/^[a-zA-Z0-9]+$/',
                     'toBeSnakeCase' => '/^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/',
@@ -567,7 +659,7 @@ final class ExpectChainUnwinder
      */
     private static function buildEachAssertion(Expr $subject, string $phpunitMethod, string $argOrder, array $terminalArgs): Stmt\Foreach_
     {
-        $itemVar = new Variable('__each_item');
+        $itemVar = new Variable(self::EACH_ITEM_VAR);
         $assertArgs = self::buildAssertArgs($itemVar, $argOrder, $terminalArgs);
 
         $assertStmt = new Stmt\Expression(
@@ -646,14 +738,41 @@ final class ExpectChainUnwinder
             return $stmts;
         }
 
+        if (count($args) === 0) {
+            $stmts[] = new Stmt\Expression(
+                new MethodCall(new Variable('this'), 'expectException', [
+                    new Arg(new ClassConstFetch(new FullyQualified('Throwable'), new Identifier('class'))),
+                ])
+            );
+        }
+
         if (count($args) >= 1) {
             $firstArgValue = $args[0]->value;
 
             if ($firstArgValue instanceof String_) {
-                // toThrow('message') — string-only = exception message
-                $stmts[] = new Stmt\Expression(
-                    new MethodCall(new Variable('this'), 'expectExceptionMessage', [$args[0]])
-                );
+                $strVal = $firstArgValue->value;
+                if ((preg_match('/(?:Exception|Error)$/', $strVal) && preg_match('/^[a-zA-Z_\\\\][a-zA-Z0-9_\\\\]*$/', $strVal)) || str_contains($strVal, '\\')) {
+                    // Class-string: toThrow('RuntimeException') or toThrow('App\Exceptions\Foo')
+                    if (str_contains($strVal, '\\')) {
+                        $classRef = new Arg(new ClassConstFetch(new FullyQualified(ltrim($strVal, '\\')), new Identifier('class')));
+                    } else {
+                        $classRef = new Arg(new ClassConstFetch(new Name($strVal), new Identifier('class')));
+                    }
+                    $stmts[] = new Stmt\Expression(
+                        new MethodCall(new Variable('this'), 'expectException', [$classRef])
+                    );
+                    // Handle second arg as message when first was class-string
+                    if (count($args) >= 2) {
+                        $stmts[] = new Stmt\Expression(
+                            new MethodCall(new Variable('this'), 'expectExceptionMessage', [$args[1]])
+                        );
+                    }
+                } else {
+                    // Plain message string
+                    $stmts[] = new Stmt\Expression(
+                        new MethodCall(new Variable('this'), 'expectExceptionMessage', [$args[0]])
+                    );
+                }
             } elseif ($firstArgValue instanceof \PhpParser\Node\Expr\New_) {
                 // toThrow(new Exception('msg')) — instance
                 $stmts[] = new Stmt\Expression(

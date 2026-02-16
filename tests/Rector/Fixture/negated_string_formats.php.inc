@@ -9,7 +9,7 @@ class NegatedStringFormatsTest extends \PHPUnit\Framework\TestCase
 {
     public function test_negated_string_formats(): void
     {
-        $this->assertDoesNotMatchRegularExpression('/^[^a-z]*$/', 'hello');
-        $this->assertDoesNotMatchRegularExpression('/^[^A-Z]*$/', 'HELLO');
+        $this->assertNotSame(strtoupper('hello'), 'hello');
+        $this->assertNotSame(strtolower('HELLO'), 'HELLO');
     }
 }

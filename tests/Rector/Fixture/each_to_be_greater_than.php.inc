@@ -8,8 +8,8 @@ class EachToBeGreaterThanTest extends \PHPUnit\Framework\TestCase
 {
     public function test_each_greater_than(): void
     {
-        foreach ($numbers as $__each_item) {
-            $this->assertGreaterThan(0, $__each_item);
+        foreach ($numbers as $__pest_each_item) {
+            $this->assertGreaterThan(0, $__pest_each_item);
         }
     }
 }

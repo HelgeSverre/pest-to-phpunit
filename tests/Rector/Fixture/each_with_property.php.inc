@@ -9,8 +9,8 @@ class EachWithPropertyTest extends \PHPUnit\Framework\TestCase
 {
     public function test_each_with_property(): void
     {
-        foreach ($users as $__each_item) {
-            $this->assertIsObject($__each_item);
+        foreach ($users as $__pest_each_item) {
+            $this->assertIsObject($__pest_each_item);
         }
     }
 }

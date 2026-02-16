@@ -11,6 +11,6 @@ class ToHaveLengthTest extends \PHPUnit\Framework\TestCase
 {
     public function test_has_length(): void
     {
-        $this->assertCount(3, [1, 2, 3]);
+        $this->assertSame(3, is_string([1, 2, 3]) ? strlen([1, 2, 3]) : count([1, 2, 3]));
     }
 }
