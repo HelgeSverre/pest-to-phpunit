@@ -223,7 +223,7 @@ CODE_SAMPLE,
                     break;
 
                 case 'describe':
-                    $describeMethods = $this->processDescribe($rootCall, '', $dataProviders, $inlineProviderCounter);
+                    $describeMethods = $this->processDescribe($rootCall, '', $dataProviders, $inlineProviderCounter, $chainModifiers);
                     foreach ($describeMethods as $dm) {
                         $methods[] = $dm['method'];
                         if (isset($dm['provider'])) {
@@ -695,7 +695,7 @@ CODE_SAMPLE,
      * @param list<ClassMethod> $dataProviders
      * @return list<array{method: ClassMethod, provider?: ClassMethod, providerCounter: int}>
      */
-    private function processDescribe(FuncCall $call, string $parentPrefix, array &$dataProviders, int $providerCounter): array
+    private function processDescribe(FuncCall $call, string $parentPrefix, array &$dataProviders, int $providerCounter, array $describeModifiers = []): array
     {
         $results = [];
         $args = $call->args;
@@ -732,13 +732,15 @@ CODE_SAMPLE,
             $funcName = $rootCall->name instanceof Name ? $rootCall->name->toString() : null;
 
             if ($funcName === 'test' || $funcName === 'it') {
-                $result = $this->processTestCall($rootCall, $funcName, $chainModifiers, $dataProviders, $providerCounter, $prefix);
+                $mergedModifiers = array_merge($describeModifiers, $chainModifiers);
+                $result = $this->processTestCall($rootCall, $funcName, $mergedModifiers, $dataProviders, $providerCounter, $prefix);
                 if ($result !== null) {
                     $results[] = $result;
                     $providerCounter = $result['providerCounter'];
                 }
             } elseif ($funcName === 'describe') {
-                $nestedResults = $this->processDescribe($rootCall, $prefix, $dataProviders, $providerCounter);
+                $nestedModifiers = array_merge($describeModifiers, $chainModifiers);
+                $nestedResults = $this->processDescribe($rootCall, $prefix, $dataProviders, $providerCounter, $nestedModifiers);
                 foreach ($nestedResults as $nr) {
                     $results[] = $nr;
                     $providerCounter = $nr['providerCounter'];
