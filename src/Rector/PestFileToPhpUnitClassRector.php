@@ -386,8 +386,8 @@ CODE_SAMPLE,
     {
         $expr = $node->expr;
 
-        // Unwrap method chains (e.g., it(...)->skip()->group())
-        while ($expr instanceof MethodCall) {
+        // Unwrap method chains and property fetches (e.g., it(...)->skip()->group(), it(...)->expect(...)->each->not->toBeUsed())
+        while ($expr instanceof MethodCall || $expr instanceof PropertyFetch) {
             $expr = $expr->var;
         }
 
@@ -407,16 +407,24 @@ CODE_SAMPLE,
      */
     private function unwrapChain(Expr $expr, array &$modifiers): Expr
     {
-        while ($expr instanceof MethodCall) {
-            $name = $expr->name instanceof Identifier ? $expr->name->name : null;
-            if ($name !== null) {
-                $args = [];
-                foreach ($expr->args as $arg) {
-                    if ($arg instanceof Arg) {
-                        $args[] = $arg;
+        while ($expr instanceof MethodCall || $expr instanceof PropertyFetch) {
+            if ($expr instanceof MethodCall) {
+                $name = $expr->name instanceof Identifier ? $expr->name->name : null;
+                if ($name !== null) {
+                    $args = [];
+                    foreach ($expr->args as $arg) {
+                        if ($arg instanceof Arg) {
+                            $args[] = $arg;
+                        }
                     }
+                    array_unshift($modifiers, ['name' => $name, 'args' => $args]);
                 }
-                array_unshift($modifiers, ['name' => $name, 'args' => $args]);
+            } else {
+                // PropertyFetch (e.g., ->each, ->not)
+                $name = $expr->name instanceof Identifier ? $expr->name->name : null;
+                if ($name !== null) {
+                    array_unshift($modifiers, ['name' => $name, 'args' => []]);
+                }
             }
             $expr = $expr->var;
         }
@@ -462,6 +470,21 @@ CODE_SAMPLE,
         } elseif ($arrowFn !== null) {
             $params = $arrowFn->params;
             $body = [new Expression($arrowFn->expr)];
+        }
+
+        // Detect higher-order arch tests: it('...')->expect(...)->each->not->toBeUsed()
+        // When there's no closure and ->expect() is a chain modifier, treat as arch test
+        if ($closure === null && $arrowFn === null) {
+            $hasExpectModifier = false;
+            foreach ($chainModifiers as $modifier) {
+                if ($modifier['name'] === 'expect') {
+                    $hasExpectModifier = true;
+                    break;
+                }
+            }
+            if ($hasExpectModifier) {
+                return $this->processArchTestMethod($methodName, $description);
+            }
         }
 
         // Process chain modifiers
@@ -968,6 +991,34 @@ CODE_SAMPLE,
                 'stmts' => [$skipStmt],
             ]
         );
+    }
+
+    /**
+     * Build a skipped arch test method result for higher-order arch patterns like it('...')->expect(...)->each->not->toBeUsed().
+     *
+     * @return array{method: ClassMethod, providerCounter: int}
+     */
+    private function processArchTestMethod(string $methodName, string $description): array
+    {
+        $skipStmt = new Expression(
+            new MethodCall(
+                new Variable('this'),
+                'markTestSkipped',
+                [new Arg(new String_('Arch test not supported in PHPUnit: ' . $description))]
+            )
+        );
+        $skipStmt->setDocComment(new Doc("/** Pest arch() test - manual review needed */"));
+
+        $method = new ClassMethod(
+            $methodName,
+            [
+                'flags' => Class_::MODIFIER_PUBLIC,
+                'returnType' => new Identifier('void'),
+                'stmts' => [$skipStmt],
+            ]
+        );
+
+        return ['method' => $method, 'providerCounter' => 0];
     }
 
     /**

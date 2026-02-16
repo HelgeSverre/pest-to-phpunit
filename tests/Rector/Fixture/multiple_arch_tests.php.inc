@@ -12,6 +12,7 @@ arch('no debugging')
     ->not->toBeUsed();
 -----
 <?php
+
 class MultipleArchTestsTest extends \PHPUnit\Framework\TestCase
 {
     public function test_models_extend_base(): void
@@ -24,7 +25,9 @@ class MultipleArchTestsTest extends \PHPUnit\Framework\TestCase
         /** Pest arch() test - manual review needed */
         $this->markTestSkipped('Arch test not supported in PHPUnit: controllers are final');
     }
+    public function test_no_debugging(): void
+    {
+        /** Pest arch() test - manual review needed */
+        $this->markTestSkipped('Arch test not supported in PHPUnit: no debugging');
+    }
 }
-arch('no debugging')
-    ->expect(['dd', 'dump', 'ray'])
-    ->not->toBeUsed();

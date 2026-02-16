@@ -1,22 +1,24 @@
 <?php
+
 test('cleans up after', function () {
-    $resource = acquire();
-    expect($resource)->toBeInstanceOf(Resource::class);
+    $file = tempnam('/tmp', 'test');
+    expect($file)->toBeString();
 })->after(function () {
-    cleanup();
+    unlink($file);
 });
 
 -----
 <?php
+
 class AfterHookTest extends \PHPUnit\Framework\TestCase
 {
     public function test_cleans_up_after(): void
     {
         try {
-            $resource = acquire();
-            $this->assertInstanceOf(Resource::class, $resource);
+            $file = tempnam('/tmp', 'test');
+            $this->assertIsString($file);
         } finally {
-            cleanup();
+            unlink($file);
         }
     }
 }

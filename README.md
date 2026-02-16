@@ -3,14 +3,14 @@
 > [!WARNING]
 > This project is experimental. It handles many common Pest patterns, but edge cases may produce incorrect output. Always review the generated code before committing.
 
-[![Latest Version on Packagist](https://img.shields.io/packagist/v/helgesverre/pest-to-phpunit.svg?style=flat-square&v=1771237613)](https://packagist.org/packages/helgesverre/pest-to-phpunit)
-[![Total Downloads](https://img.shields.io/packagist/dt/helgesverre/pest-to-phpunit.svg?style=flat-square&v=1771237613)](https://packagist.org/packages/helgesverre/pest-to-phpunit)
-[![PHP Version](https://img.shields.io/packagist/php-v/helgesverre/pest-to-phpunit.svg?style=flat-square&v=1771237613)](https://packagist.org/packages/helgesverre/pest-to-phpunit)
-[![License](https://img.shields.io/packagist/l/helgesverre/pest-to-phpunit.svg?style=flat-square&v=1771237613)](LICENSE)
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/helgesverre/pest-to-phpunit.svg?style=flat-square)](https://packagist.org/packages/helgesverre/pest-to-phpunit)
+[![Total Downloads](https://img.shields.io/packagist/dt/helgesverre/pest-to-phpunit.svg?style=flat-square)](https://packagist.org/packages/helgesverre/pest-to-phpunit)
+[![PHP Version](https://img.shields.io/packagist/php-v/helgesverre/pest-to-phpunit.svg?style=flat-square)](https://packagist.org/packages/helgesverre/pest-to-phpunit)
+[![License](https://img.shields.io/packagist/l/helgesverre/pest-to-phpunit.svg?style=flat-square)](LICENSE)
 
 A **Rector extension** that automatically converts **Pest** test files into **PHPUnit** test classes.
 
-Handles `test()` / `it()` blocks, hooks, datasets, `expect()` assertion chains, modifiers, and more — getting you most of the way there automatically while leaving clear markers for anything that needs manual review.
+Handles `test()` / `it()` blocks, hooks, datasets, `expect()` assertion chains, modifiers, and more — getting you most of the way there automatically while leaving clear `TODO` markers for anything that needs manual review.
 
 ## Installation
 
@@ -256,75 +256,209 @@ class DatasetTest extends \PHPUnit\Framework\TestCase
 
 ## Feature Support
 
-### Core constructs
+### Core Constructs
 
-| Pest feature | Status | PHPUnit output |
+| Pest Feature | Status | PHPUnit Output |
 |---|:---:|---|
 | `test()` / `it()` | ✅ | `public function test_*(): void` |
-| `describe()` (nested) | ✅ | Method name prefixing |
+| `describe()` (nested, 4+ levels deep) | ✅ | Method name prefixing |
 | `beforeEach` / `afterEach` | ✅ | `setUp()` / `tearDown()` |
 | `beforeAll` / `afterAll` | ✅ | `setUpBeforeClass()` / `tearDownAfterClass()` |
-| `uses()` | ✅ | `extends` + `use` traits |
-| `covers()` | ✅ | `#[CoversClass]` |
+| `uses(TestCase::class)` | ✅ | `extends TestCase` |
+| `uses(Trait::class)` | ✅ | `use Trait;` |
+| `covers(Foo::class)` | ✅ | `#[CoversClass(Foo::class)]` |
 | `coversNothing()` | ✅ | `#[CoversNothing]` |
+| `dataset('name', [...])` | ✅ | Static data provider method |
+| `dataset('name', fn() => ...)` | ✅ | Generator-based provider |
+| Describe-scoped `beforeEach`/`afterEach` | ✅ | Inlined into test methods (try/finally for afterEach) |
 | Non-Pest code preserved | ✅ | Kept alongside generated class |
 
-### `expect()` assertion mapping
+### Test Modifiers
 
-| Pest assertion | PHPUnit equivalent |
+| Modifier | Status | PHPUnit Output |
+|---|:---:|---|
+| `->skip('reason')` | ✅ | `$this->markTestSkipped(...)` |
+| `->skip($condition, 'reason')` | ✅ | Conditional `if` + `markTestSkipped` |
+| `->todo()` | ✅ | `$this->markTestIncomplete('TODO')` |
+| `->group('name')` | ✅ | `#[Group('name')]` |
+| `->depends('test')` | ✅ | `#[Depends('test_*')]` |
+| `->covers(Foo::class)` | ✅ | `#[CoversClass(Foo::class)]` |
+| `->with('dataset')` | ✅ | `#[DataProvider('dataset')]` |
+| `->with([...])` | ✅ | Inline provider method + `#[DataProvider]` |
+| Multiple `->with()` (cross-join) | ✅ | Composed cross-join provider method |
+| `->throws(Exception::class)` | ✅ | `expectException` + `expectExceptionMessage` |
+| `->after(fn() => ...)` | ✅ | Test body wrapped in `try/finally` |
+| `->repeat(N)` | ✅ | `for` loop wrapping test body |
+| `->only()` | ✅ | `#[Group('only')]` |
+
+### `expect()` Assertions
+
+#### Type Assertions
+
+| Pest Assertion | Status | PHPUnit Equivalent |
+|---|:---:|---|
+| `toBeString` / `toBeInt` / `toBeFloat` / `toBeArray` | ✅ | `assertIsString` / `assertIsInt` / `assertIsFloat` / `assertIsArray` |
+| `toBeBool` / `toBeCallable` / `toBeIterable` | ✅ | `assertIsBool` / `assertIsCallable` / `assertIsIterable` |
+| `toBeNumeric` / `toBeObject` / `toBeResource` / `toBeScalar` | ✅ | `assertIsNumeric` / `assertIsObject` / `assertIsResource` / `assertIsScalar` |
+| `toBeInstanceOf` | ✅ | `assertInstanceOf` |
+
+#### Value Assertions
+
+| Pest Assertion | Status | PHPUnit Equivalent |
+|---|:---:|---|
+| `toBe` | ✅ | `assertSame` |
+| `toEqual` | ✅ | `assertEquals` |
+| `toBeTrue` / `toBeFalse` | ✅ | `assertTrue` / `assertFalse` |
+| `toBeTruthy` / `toBeFalsy` | ✅ | `assertNotEmpty` / `assertEmpty` |
+| `toBeNull` | ✅ | `assertNull` |
+| `toBeEmpty` | ✅ | `assertEmpty` |
+| `toBeJson` | ✅ | `assertJson` |
+| `toBeNan` / `toBeFinite` / `toBeInfinite` | ✅ | `assertNan` / `assertIsFinite` / `assertIsInfinite` |
+
+#### Comparison Assertions
+
+| Pest Assertion | Status | PHPUnit Equivalent |
+|---|:---:|---|
+| `toBeGreaterThan` / `toBeLessThan` | ✅ | `assertGreaterThan` / `assertLessThan` |
+| `toBeGreaterThanOrEqual` / `toBeLessThanOrEqual` | ✅ | `assertGreaterThanOrEqual` / `assertLessThanOrEqual` |
+| `toBeBetween($min, $max)` | ✅ | `assertGreaterThanOrEqual` + `assertLessThanOrEqual` |
+| `toEqualWithDelta` | ✅ | `assertEqualsWithDelta` |
+| `toEqualCanonicalizing` | ✅ | `assertEqualsCanonicalizing` |
+
+#### String Assertions
+
+| Pest Assertion | Status | PHPUnit Equivalent |
+|---|:---:|---|
+| `toStartWith` / `toEndWith` | ✅ | `assertStringStartsWith` / `assertStringEndsWith` |
+| `toMatch` | ✅ | `assertMatchesRegularExpression` |
+| `toContain` | ✅ | `assertContains` |
+| `toContain($a, $b, $c)` (multi-arg) | ✅ | Multiple `assertContains` calls |
+
+#### Array / Collection Assertions
+
+| Pest Assertion | Status | PHPUnit Equivalent |
+|---|:---:|---|
+| `toHaveCount` / `toHaveLength` | ✅ | `assertCount` |
+| `toHaveKey` | ✅ | `assertArrayHasKey` |
+| `toHaveKeys(['a', 'b'])` | ✅ | Multiple `assertArrayHasKey` calls |
+| `toContainEqual` | ✅ | `assertContainsEquals` |
+| `toHaveSameSize` | ✅ | `assertSameSize` |
+| `toBeList` | ✅ | `assertIsList` |
+| `toMatchArray` / `toMatchObject` | ✅ | `assertEquals` |
+
+#### Object Assertions
+
+| Pest Assertion | Status | PHPUnit Equivalent |
+|---|:---:|---|
+| `toHaveProperty('name')` | ✅ | `assertObjectHasProperty` |
+| `toHaveProperties(['a', 'b'])` | ✅ | Multiple `assertObjectHasProperty` calls |
+| `toHaveProperties(['name' => 'John'])` | ✅ | `assertSame` per key-value pair |
+| `toHaveMethod('foo')` | ✅ | `assertTrue(method_exists(...))` |
+| `toMatchConstraint($c)` | ✅ | `assertThat($subject, $constraint)` |
+
+#### File / Directory Assertions
+
+| Pest Assertion | Status | PHPUnit Equivalent |
+|---|:---:|---|
+| `toBeFile` / `toBeDirectory` | ✅ | `assertFileExists` / `assertDirectoryExists` |
+| `toBeReadableFile` / `toBeWritableFile` | ✅ | `assertFileIsReadable` / `assertFileIsWritable` |
+| `toBeReadableDirectory` / `toBeWritableDirectory` | ✅ | `assertDirectoryIsReadable` / `assertDirectoryIsWritable` |
+
+#### String Format Assertions (via regex)
+
+| Pest Assertion | Status | PHPUnit Equivalent |
+|---|:---:|---|
+| `toBeUppercase` / `toBeLowercase` | ✅ | `assertMatchesRegularExpression` |
+| `toBeAlpha` / `toBeAlphaNumeric` / `toBeDigits` | ✅ | `assertMatchesRegularExpression` |
+| `toBeSnakeCase` / `toBeKebabCase` / `toBeCamelCase` / `toBeStudlyCase` | ✅ | `assertMatchesRegularExpression` |
+| `toBeUuid` / `toBeUrl` | ✅ | `assertMatchesRegularExpression` |
+
+#### Array Key Format Assertions
+
+| Pest Assertion | Status | PHPUnit Equivalent |
+|---|:---:|---|
+| `toHaveSnakeCaseKeys` / `toHaveKebabCaseKeys` | ✅ | `foreach (array_keys(...))` + regex assert |
+| `toHaveCamelCaseKeys` / `toHaveStudlyCaseKeys` | ✅ | `foreach (array_keys(...))` + regex assert |
+
+#### Exception Assertions
+
+| Pest Assertion | Status | PHPUnit Equivalent |
+|---|:---:|---|
+| `toThrow(Exception::class)` | ✅ | `expectException` + invoke callable |
+| `toThrow(Exception::class, 'msg')` | ✅ | `expectException` + `expectExceptionMessage` |
+| `toThrow(new Exception('msg'))` | ✅ | `expectException` + `expectExceptionMessage` |
+| `toThrow('message')` | ✅ | `expectExceptionMessage` |
+| `not->toThrow()` | ✅ | `try/catch` with `$this->fail()` on exception |
+
+#### Laravel-Specific Assertions
+
+| Pest Assertion | Status | PHPUnit Equivalent |
+|---|:---:|---|
+| `toBeCollection` | ✅ | `assertInstanceOf(Collection::class)` |
+| `toBeModel` | ✅ | `assertInstanceOf(Model::class)` |
+| `toBeEloquentCollection` | ✅ | `assertInstanceOf(EloquentCollection::class)` |
+
+### Chain Modifiers
+
+| Modifier | Status | Behavior |
+|---|:---:|---|
+| `->not->*` | ✅ | Negated equivalents (`assertNotSame`, `assertNotNull`, etc.) |
+| `->and($subject)` | ✅ | Split into multiple assertion groups |
+| `->each->*` (no closure) | ✅ | `foreach` loop with assertion per item |
+| `->tap(fn() => ...)` | ✅ | Closure body inlined |
+| `->pipe(fn($v) => ...)` | ✅ | Subject transformed: `(fn($v) => ...)($subject)` |
+| Property access (e.g. `->name`) | ✅ | `$subject->name` |
+| Method access (e.g. `->count()`) | ✅ | `$subject->count()` |
+
+### Silently Stripped (debug/dev-only)
+
+These Pest methods are removed from the chain without emitting any output:
+
+| Modifier | Reason |
 |---|---|
-| `toBe` | `assertSame` |
-| `toEqual` | `assertEquals` |
-| `toBeTrue` / `toBeFalse` | `assertTrue` / `assertFalse` |
-| `toBeNull` | `assertNull` |
-| `toBeEmpty` | `assertEmpty` |
-| `toContain` | `assertContains` |
-| `toHaveCount` / `toHaveLength` | `assertCount` |
-| `toBeInstanceOf` | `assertInstanceOf` |
-| `toMatch` | `assertMatchesRegularExpression` |
-| `toStartWith` / `toEndWith` | `assertStringStartsWith` / `assertStringEndsWith` |
-| `toBeString` / `toBeInt` / `toBeFloat` / `toBeArray` / `toBeBool` | `assertIs*` |
-| `toBeGreaterThan` / `toBeLessThan` (and `OrEqual` variants) | `assertGreaterThan` / `assertLessThan` |
-| `toHaveKey` | `assertArrayHasKey` |
-| `toBeFile` / `toBeDirectory` | `assertFileExists` / `assertDirectoryExists` |
-| `toBeJson` | `assertJson` |
-| `toBeNan` / `toBeFinite` / `toBeInfinite` | `assertNan` / `assertIsFinite` / `assertIsInfinite` |
-| `toThrow` | `expectException` + invoke callable |
-| `toMatchArray` | `assertEquals` |
-| `toHaveProperty` | `assertObjectHasProperty` |
-| `toBeBetween` | `assertGreaterThanOrEqual` + `assertLessThanOrEqual` |
-| `toHaveMethod` | `assertTrue(method_exists(...))` |
-| `->not->*` | Negated equivalents (`assertNotSame`, `assertNotNull`, etc.) |
-| `->and(...)` | Split into multiple assertions |
-| `->each->*` | `foreach` loop with assertion |
+| `->dd()` / `->ddWhen()` / `->ddUnless()` | Debug — dump and die |
+| `->ray()` | Debug — Ray debugger |
+| `->json()` | Output modifier — no assertion equivalent |
+| `->defer()` | Timing modifier — no assertion equivalent |
 
-### Test modifiers
+### Converted to `markTestSkipped` ⚠️
 
-| Modifier | PHPUnit output |
+These features have no PHPUnit equivalent and are converted to skipped tests with a review comment:
+
+| Pest Feature | PHPUnit Output |
 |---|---|
-| `->skip('reason')` | `$this->markTestSkipped(...)` |
-| `->todo()` | `$this->markTestIncomplete('TODO')` |
-| `->group('name')` | `#[Group('name')]` |
-| `->depends('test')` | `#[Depends('test_*')]` |
-| `->covers(Foo::class)` | `#[CoversClass(Foo::class)]` |
-| `->with('dataset')` | `#[DataProvider('dataset')]` |
-| `->with([...])` | Inline provider method + `#[DataProvider]` |
-| `->throws(Exception::class)` | `expectException` + `expectExceptionMessage` |
+| `arch()` tests | `$this->markTestSkipped('Arch test not supported in PHPUnit: ...')` |
+| Higher-order `it('...')->expect([...])->toBeUsed()` | `$this->markTestSkipped('Arch test not supported in PHPUnit: ...')` |
 
-### Partial / manual review needed
+### Emits `// TODO` Comment ⚠️
 
-| Pest feature | Output |
+These features emit a TODO comment because they require manual conversion:
+
+| Pest Feature | TODO Comment |
 |---|---|
-| `arch()` tests | `markTestSkipped` with review comment |
-| Higher-order expectations (`it()->expect()->...`) | `markTestSkipped` with review comment |
-| `sequence`, `json`, `defer`, `ray` modifiers | Silently skipped |
+| `->sequence(...)` | `// TODO(Pest): ->sequence() requires manual conversion to PHPUnit` |
+| `->match(...)` | `// TODO(Pest): ->match() requires manual conversion to PHPUnit` |
+| `->scoped(...)` | `// TODO(Pest): ->scoped() requires manual conversion to PHPUnit` |
+| `->each(fn() => ...)` (with closure) | `// TODO(Pest): ->each(closure) requires manual conversion to PHPUnit` |
+| `->when(...)` / `->unless(...)` | `// TODO(Pest): ->when()/->unless() requires manual conversion to PHPUnit` |
+| Unknown `->toXxx()` expectations | `// TODO(Pest): Unknown expectation ->toXxx() has no PHPUnit equivalent` |
+
+### Not Supported
+
+| Pest Feature | Notes |
+|---|---|
+| `expect()->extend('name', fn)` | Custom expectation macros — emits TODO |
+| Higher-order test methods (e.g. `it('...')->assertTrue()`) | Not converted |
+| Pest plugins (Livewire, Laravel, etc.) | Plugin-specific expectations emit TODO |
+| `beforeAll`/`afterAll` inside `describe()` | No clean PHPUnit equivalent without multiple classes |
 
 ## Limitations
 
-- **Not a 100% migration tool.** Some Pest features have no direct PHPUnit equivalent — these are converted to skipped tests with a docblock prompting manual review.
-- **Assertion coverage** is broad (~40 mappings) but doesn't cover every Pest plugin or custom macro.
+- **Not a 100% migration tool.** Some Pest features have no direct PHPUnit equivalent — these are converted to skipped tests or TODO comments prompting manual review.
+- **Assertion coverage** is broad (60+ mappings including negations) but doesn't cover every Pest plugin or custom expectation macro.
 - **Method naming** uses `snake_case` with a `test_` prefix. Long `describe()` chains can produce long method names.
 - **File structure** — the rule generates a class in-place. You may need to manually adjust namespaces or file locations.
+- **String format assertions** (`toBeSnakeCase`, `toBeUuid`, etc.) use regex approximations that may not match Pest's exact validation logic.
 
 ## Development
 
