@@ -20,7 +20,7 @@ final class ExpectationMethodMap
         'toBeTrue' => ['assertTrue', 'actual_only'],
         'toBeFalse' => ['assertFalse', 'actual_only'],
         'toBeEmpty' => ['assertEmpty', 'actual_only'],
-        'toContain' => ['assertContains', 'expected_actual'],
+
         'toHaveCount' => ['assertCount', 'expected_actual'],
         'toBeInstanceOf' => ['assertInstanceOf', 'expected_actual'],
         'toMatch' => ['assertMatchesRegularExpression', 'expected_actual'],
@@ -72,6 +72,7 @@ final class ExpectationMethodMap
         'assertFalse' => 'assertNotFalse',
         'assertEmpty' => 'assertNotEmpty',
         'assertContains' => 'assertNotContains',
+        'assertStringContainsString' => 'assertStringNotContainsString',
         'assertCount' => 'assertNotCount',
         'assertInstanceOf' => 'assertNotInstanceOf',
         'assertMatchesRegularExpression' => 'assertDoesNotMatchRegularExpression',

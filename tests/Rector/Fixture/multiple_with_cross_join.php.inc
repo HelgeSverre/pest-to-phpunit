@@ -11,11 +11,11 @@ class MultipleWithCrossJoinTest extends \PHPUnit\Framework\TestCase
 {
     public static function test_cross_join_provider(): array
     {
-        return [1, 2];
+        return [[1], [2]];
     }
     public static function test_cross_join_provider_2(): array
     {
-        return [10, 20];
+        return [[10], [20]];
     }
     #[\PHPUnit\Framework\Attributes\DataProvider('test_cross_join_provider')]
     #[\PHPUnit\Framework\Attributes\DataProvider('test_cross_join_provider_2')]

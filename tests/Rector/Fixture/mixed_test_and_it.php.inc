@@ -26,7 +26,7 @@ class MixedTestAndItTest extends \PHPUnit\Framework\TestCase
     }
     public function test_it_validates_email(): void
     {
-        $this->assertContains('@', 'test@example.com');
+        $this->assertStringContainsString('@', 'test@example.com');
     }
     public function test_deletes_user(): void
     {

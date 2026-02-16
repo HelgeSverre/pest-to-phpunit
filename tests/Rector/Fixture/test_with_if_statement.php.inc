@@ -16,7 +16,9 @@ class TestWithIfStatementTest extends \PHPUnit\Framework\TestCase
     {
         $value = computeValue();
         if ($value > 0) {
+            $this->assertGreaterThan(0, $value);
         } else {
+            $this->assertLessThanOrEqual(0, $value);
         }
     }
 }

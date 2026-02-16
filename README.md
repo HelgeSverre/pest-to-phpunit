@@ -232,6 +232,40 @@ class ToThrowTest extends \PHPUnit\Framework\TestCase
 }
 ```
 
+### Pest Faker Plugin
+
+```php
+// Before
+use function Pest\Faker\fake;
+
+test('generates a name', function () {
+    $name = fake()->name;
+    expect($name)->toBeString();
+});
+
+test('with locale', function () {
+    $name = fake('pt_PT')->name;
+    expect($name)->toBeString();
+});
+
+// After
+class FakerTest extends \PHPUnit\Framework\TestCase
+{
+    public function test_generates_a_name(): void
+    {
+        $name = \Faker\Factory::create()->name;
+        $this->assertIsString($name);
+    }
+    public function test_with_locale(): void
+    {
+        $name = \Faker\Factory::create('pt_PT')->name;
+        $this->assertIsString($name);
+    }
+}
+```
+
+The `use function Pest\Faker\fake;` import is automatically removed. `$this->faker` via the `WithFaker` trait works naturally through trait conversion (see `uses()` above).
+
 ### Datasets → `#[DataProvider]`
 
 ```php
@@ -419,6 +453,17 @@ class DatasetTest extends \PHPUnit\Framework\TestCase
 | `->pipe(fn($v) => ...)`          |   ✅   | Subject transformed: `(fn($v) => ...)($subject)`             |
 | Property access (e.g. `->name`)  |   ✅   | `$subject->name`                                             |
 | Method access (e.g. `->count()`) |   ✅   | `$subject->count()`                                          |
+
+### Pest Plugins
+
+| Plugin                                     | Status | Behavior                                                           |
+| ------------------------------------------ | :----: | ------------------------------------------------------------------ |
+| `pest-plugin-faker` — `fake()`             |   ✅   | Converted to `\Faker\Factory::create()`, locale arg preserved      |
+| `pest-plugin-faker` — `fake('pt_PT')`      |   ✅   | Converted to `\Faker\Factory::create('pt_PT')`                     |
+| `pest-plugin-faker` — `WithFaker` trait    |   ✅   | Works via `uses()` trait conversion, `$this->faker` preserved      |
+| `use function Pest\Faker\fake;`            |   ✅   | Import automatically removed                                       |
+| `use function Pest\Laravel\{get, post};`   |   ✅   | Grouped imports automatically removed                               |
+| `use function Pest\Livewire\livewire;`     |   ✅   | Import automatically removed                                       |
 
 ### Silently Stripped (debug/dev-only)
 

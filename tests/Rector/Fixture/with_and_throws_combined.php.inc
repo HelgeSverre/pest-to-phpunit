@@ -8,7 +8,7 @@ class WithAndThrowsCombinedTest extends \PHPUnit\Framework\TestCase
 {
     public static function test_throws_per_dataset_provider(): array
     {
-        return ['', null, false];
+        return [[''], [null], [false]];
     }
     #[\PHPUnit\Framework\Attributes\DataProvider('test_throws_per_dataset_provider')]
     public function test_throws_per_dataset(string $input): void

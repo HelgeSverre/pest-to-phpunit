@@ -16,6 +16,7 @@ class TestEarlyReturnTest extends \PHPUnit\Framework\TestCase
     {
         $value = getValue();
         if ($value === null) {
+            $this->assertNull($value);
             return;
         }
         $this->assertIsString($value);

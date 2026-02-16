@@ -8,7 +8,7 @@ class DatasetSingleValuesTest extends \PHPUnit\Framework\TestCase
 {
     public static function test_single_value_dataset_provider(): array
     {
-        return ['red', 'green', 'blue'];
+        return [['red'], ['green'], ['blue']];
     }
     #[\PHPUnit\Framework\Attributes\DataProvider('test_single_value_dataset_provider')]
     public function test_single_value_dataset(string $color): void

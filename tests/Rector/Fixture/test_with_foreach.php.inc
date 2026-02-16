@@ -13,6 +13,7 @@ class TestWithForeachTest extends \PHPUnit\Framework\TestCase
     {
         $items = ['a', 'b', 'c'];
         foreach ($items as $item) {
+            $this->assertIsString($item);
         }
     }
 }

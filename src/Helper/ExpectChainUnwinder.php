@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace HelgeSverre\PestToPhpUnit\Helper;
 
 use HelgeSverre\PestToPhpUnit\Mapping\ExpectationMethodMap;
+use HelgeSverre\PestToPhpUnit\Model\CustomExpectation;
 use PhpParser\Comment;
 use PhpParser\Node;
 use PhpParser\Node\Arg;
@@ -33,7 +34,7 @@ final class ExpectChainUnwinder
      *
      * @return list<Stmt>|null
      */
-    public static function unwind(Expr $expr): ?array
+    public static function unwind(Expr $expr, bool $initialNegated = false): ?array
     {
         $segments = self::flattenChain($expr);
 
@@ -41,7 +42,7 @@ final class ExpectChainUnwinder
             return null;
         }
 
-        return self::segmentsToStatements($segments);
+        return self::segmentsToStatements($segments, $initialNegated);
     }
 
     /**
@@ -134,12 +135,12 @@ final class ExpectChainUnwinder
      * @param list<array{subject: Expr, parts: list<array{type: string, name: string, args: list<Arg>}>}> $groups
      * @return list<Stmt>
      */
-    private static function segmentsToStatements(array $groups): array
+    private static function segmentsToStatements(array $groups, bool $initialNegated = false): array
     {
         $stmts = [];
 
-        foreach ($groups as $group) {
-            $groupStmts = self::processGroup($group['subject'], $group['parts']);
+        foreach ($groups as $i => $group) {
+            $groupStmts = self::processGroup($group['subject'], $group['parts'], $i === 0 ? $initialNegated : false);
             array_push($stmts, ...$groupStmts);
         }
 
@@ -150,10 +151,10 @@ final class ExpectChainUnwinder
      * @param list<array{type: string, name: string, args: list<Arg>}> $parts
      * @return list<Stmt>
      */
-    private static function processGroup(Expr $subject, array $parts): array
+    private static function processGroup(Expr $subject, array $parts, bool $initialNegated = false): array
     {
         $stmts = [];
-        $negated = false;
+        $negated = $initialNegated;
         $eachMode = false;
         $assertChaining = false;
         $currentSubject = $subject;
@@ -249,12 +250,31 @@ final class ExpectChainUnwinder
                 continue;
             }
 
-            // Multi-arg toContain: toContain($a, $b, $c) → multiple assertContains
-            if ($name === 'toContain' && count($args) > 1) {
-                $phpunitMethod = $negated ? 'assertNotContains' : 'assertContains';
+            // toContain: use assertStringContainsString for string literal subjects, assertContains otherwise
+            if ($name === 'toContain') {
+                $isStringSubject = $currentSubject instanceof String_;
+
+                if ($eachMode) {
+                    // In each mode we iterate over items — can't know their type, use assertContains
+                    $baseMethod = 'assertContains';
+                    $negMethod = 'assertNotContains';
+                } elseif ($isStringSubject) {
+                    $baseMethod = 'assertStringContainsString';
+                    $negMethod = 'assertStringNotContainsString';
+                } else {
+                    $baseMethod = 'assertContains';
+                    $negMethod = 'assertNotContains';
+                }
+
+                $phpunitMethod = $negated ? $negMethod : $baseMethod;
                 $negated = false;
+
                 foreach ($args as $singleArg) {
-                    $stmts[] = self::buildAssertion($currentSubject, $phpunitMethod, 'expected_actual', [$singleArg]);
+                    if ($eachMode) {
+                        $stmts[] = self::buildEachAssertion($currentSubject, $phpunitMethod, 'expected_actual', [$singleArg]);
+                    } else {
+                        $stmts[] = self::buildAssertion($currentSubject, $phpunitMethod, 'expected_actual', [$singleArg]);
+                    }
                 }
                 continue;
             }
@@ -575,6 +595,26 @@ final class ExpectChainUnwinder
             if ($part['type'] === 'method' && str_starts_with($name, 'assert')) {
                 $currentSubject = new MethodCall($currentSubject, new Identifier($name), $args);
                 $assertChaining = true;
+                continue;
+            }
+
+            // Check custom expectation registry before treating as unknown
+            if ($part['type'] === 'method' && CustomExpectationRegistry::has($name)) {
+                $customExpect = CustomExpectationRegistry::get($name);
+                $inlinedSubject = $eachMode ? new Variable(self::EACH_ITEM_VAR) : $currentSubject;
+
+                $inlinedStmts = CustomExpectationInliner::inline($customExpect, $inlinedSubject, $args, $negated);
+
+                if ($eachMode && $inlinedStmts !== []) {
+                    $stmts[] = new Stmt\Foreach_(
+                        $currentSubject,
+                        new Variable(self::EACH_ITEM_VAR),
+                        ['stmts' => $inlinedStmts]
+                    );
+                } else {
+                    array_push($stmts, ...$inlinedStmts);
+                }
+                $negated = false;
                 continue;
             }
 

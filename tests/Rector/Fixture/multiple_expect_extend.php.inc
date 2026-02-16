@@ -14,19 +14,11 @@ test('custom expects', function () {
 -----
 <?php
 
-/**
- * TODO(Pest): The following custom expectations were defined via expect()->extend()
- * and cannot be auto-converted to PHPUnit:
- *   - toBePositive
- *   - toBeEven
- */
 class MultipleExpectExtendTest extends \PHPUnit\Framework\TestCase
 {
-    // TODO(Pest): Custom expectation 'toBePositive' defined via expect()->extend() cannot be auto-converted to PHPUnit
-    // TODO(Pest): Custom expectation 'toBeEven' defined via expect()->extend() cannot be auto-converted to PHPUnit
     public function test_custom_expects(): void
     {
-        // TODO(Pest): Unknown expectation ->toBePositive() has no PHPUnit equivalent
-        // TODO(Pest): Unknown expectation ->toBeEven() has no PHPUnit equivalent
+        $this->assertGreaterThan(0, 5);
+        $this->assertSame(0, 4 % 2);
     }
 }

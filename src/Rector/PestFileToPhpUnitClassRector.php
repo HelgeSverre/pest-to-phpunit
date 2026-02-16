@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HelgeSverre\PestToPhpUnit\Rector;
 
+use HelgeSverre\PestToPhpUnit\Helper\CustomExpectationRegistry;
 use HelgeSverre\PestToPhpUnit\Helper\ExpectChainUnwinder;
 use HelgeSverre\PestToPhpUnit\Helper\NameHelper;
 use HelgeSverre\PestToPhpUnit\Mapping\ExpectationMethodMap;
@@ -42,6 +43,7 @@ use PhpParser\Node\Stmt\Property;
 use PhpParser\Node\Stmt\PropertyProperty;
 use PhpParser\Node\Stmt\Return_;
 use PhpParser\Node\Stmt\TraitUse;
+use PhpParser\Node\Stmt\GroupUse;
 use PhpParser\Node\Stmt\Use_;
 use PhpParser\NodeVisitor;
 use Rector\PhpParser\Node\FileNode;
@@ -87,7 +89,7 @@ CODE_SAMPLE,
 
     public function getNodeTypes(): array
     {
-        return [Expression::class];
+        return [Expression::class, Use_::class, GroupUse::class];
     }
 
     /**
@@ -95,6 +97,17 @@ CODE_SAMPLE,
      */
     public function refactor(Node $node): mixed
     {
+        // Strip `use function Pest\...` imports
+        if ($node instanceof Use_ && $node->type === Use_::TYPE_FUNCTION) {
+            return $this->refactorPestFunctionUse($node);
+        }
+        if ($node instanceof GroupUse && $node->type === Use_::TYPE_FUNCTION) {
+            if (str_starts_with($node->prefix->toString(), 'Pest\\')) {
+                return NodeVisitor::REMOVE_NODE;
+            }
+            return null;
+        }
+
         if (! $node instanceof Expression) {
             return null;
         }
@@ -159,6 +172,39 @@ CODE_SAMPLE,
             return null;
         }
 
+        // Pre-scan: collect expect()->extend() definitions into the registry
+        CustomExpectationRegistry::collectFromStatements($pestStmts);
+
+        // Filter out expect()->extend() statements — they've been consumed by the registry
+        $nonExtendStmts = [];
+        foreach ($pestStmts as $pestStmt) {
+            $expr = $pestStmt->expr;
+            $chainMods = [];
+            $rootCall = $this->unwrapChain($expr, $chainMods);
+            if ($rootCall instanceof FuncCall) {
+                $fn = $rootCall->name instanceof Name ? $rootCall->name->toString() : null;
+                if ($fn === 'expect') {
+                    $isExtend = false;
+                    foreach ($chainMods as $mod) {
+                        if ($mod['name'] === 'extend') {
+                            $isExtend = true;
+                            break;
+                        }
+                    }
+                    if ($isExtend) {
+                        continue;
+                    }
+                }
+            }
+            $nonExtendStmts[] = $pestStmt;
+        }
+
+        // If only extend() definitions remain, no class to generate — leave file unchanged
+        if ($nonExtendStmts === []) {
+            unset($this->processedFiles[$filePath]);
+            return null;
+        }
+
         // Derive class name from file path
         $className = NameHelper::fileNameToClassName(basename($filePath));
 
@@ -169,9 +215,8 @@ CODE_SAMPLE,
         $classAttributes = [];
         $dataProviders = [];
         $inlineProviderCounter = 0;
-        $customExpectations = [];
 
-        foreach ($pestStmts as $pestStmt) {
+        foreach ($nonExtendStmts as $pestStmt) {
             $expr = $pestStmt->expr;
 
             // Unwrap method chains to find the root function call
@@ -289,21 +334,7 @@ CODE_SAMPLE,
                     break;
 
                 case 'expect':
-                    // Check for expect()->extend() pattern
-                    $hasExtend = false;
-                    foreach ($chainModifiers as $mod) {
-                        if ($mod['name'] === 'extend') {
-                            $hasExtend = true;
-                            $extendName = (count($mod['args']) > 0 && $mod['args'][0]->value instanceof String_)
-                                ? $mod['args'][0]->value->value
-                                : 'unknown';
-                            $customExpectations[] = $extendName;
-                            $nop = new Nop();
-                            $nop->setAttribute('comments', [new Comment("// TODO(Pest): Custom expectation '{$extendName}' defined via expect()->extend() cannot be auto-converted to PHPUnit")]);
-                            $methods[] = $nop;
-                            break;
-                        }
-                    }
+                    // Non-extend expect() calls at top-level — skip silently
                     break;
             }
         }
@@ -349,16 +380,6 @@ CODE_SAMPLE,
             ]
         );
 
-        if ($customExpectations !== []) {
-            $docLines = ['/**'];
-            $docLines[] = ' * TODO(Pest): The following custom expectations were defined via expect()->extend()';
-            $docLines[] = ' * and cannot be auto-converted to PHPUnit:';
-            foreach ($customExpectations as $ce) {
-                $docLines[] = ' *   - ' . $ce;
-            }
-            $docLines[] = ' */';
-            $class->setDocComment(new Doc(implode("\n", $docLines)));
-        }
         $class->namespacedName = new Name($className);
         $class->setAttribute('startLine', $node->getStartLine());
         $class->setAttribute('endLine', $node->getEndLine());
@@ -1077,6 +1098,32 @@ CODE_SAMPLE,
             if ($firstArg instanceof Closure) {
                 $body = $firstArg->stmts ?? [];
             } else {
+                // Check if items need wrapping for PHPUnit data providers
+                // Pest wraps scalar values: is_array($v) ? $v : [$v]
+                $needsWrapping = true;
+                foreach ($firstArg->items as $item) {
+                    if ($item !== null && $item->value instanceof Array_) {
+                        $needsWrapping = false;
+                        break;
+                    }
+                }
+
+                if ($needsWrapping && $firstArg->items !== []) {
+                    $wrappedItems = [];
+                    foreach ($firstArg->items as $item) {
+                        if ($item !== null) {
+                            $wrappedItems[] = new \PhpParser\Node\ArrayItem(
+                                new Array_(
+                                    [new \PhpParser\Node\ArrayItem($item->value)],
+                                    ['kind' => Array_::KIND_SHORT]
+                                ),
+                                $item->key
+                            );
+                        }
+                    }
+                    $firstArg = new Array_($wrappedItems, ['kind' => Array_::KIND_SHORT]);
+                }
+
                 $body = [new Return_($firstArg)];
             }
 
@@ -1159,10 +1206,46 @@ CODE_SAMPLE,
                 }
             }
 
+            // Recurse into child statement blocks (if, for, foreach, etc.)
+            $this->transformChildBlocks($stmt);
+
             $result[] = $stmt;
         }
 
+        // Rewrite fake() calls to \Faker\Factory::create()
+        $result = array_map(fn (Stmt $s) => $this->transformFakeCallsInStmt($s), $result);
+
         return $result;
+    }
+
+    /**
+     * Recursively transform expect() chains inside nested statement blocks.
+     */
+    private function transformChildBlocks(Stmt $stmt): void
+    {
+        if ($stmt instanceof Stmt\If_) {
+            $stmt->stmts = $this->transformBody($stmt->stmts);
+            foreach ($stmt->elseifs as $elseif) {
+                $elseif->stmts = $this->transformBody($elseif->stmts);
+            }
+            if ($stmt->else !== null) {
+                $stmt->else->stmts = $this->transformBody($stmt->else->stmts);
+            }
+        } elseif ($stmt instanceof Stmt\For_ || $stmt instanceof Stmt\Foreach_ || $stmt instanceof Stmt\While_ || $stmt instanceof Stmt\Do_) {
+            $stmt->stmts = $this->transformBody($stmt->stmts);
+        } elseif ($stmt instanceof Stmt\TryCatch) {
+            $stmt->stmts = $this->transformBody($stmt->stmts);
+            foreach ($stmt->catches as $catch) {
+                $catch->stmts = $this->transformBody($catch->stmts);
+            }
+            if ($stmt->finally !== null) {
+                $stmt->finally->stmts = $this->transformBody($stmt->finally->stmts);
+            }
+        } elseif ($stmt instanceof Stmt\Switch_) {
+            foreach ($stmt->cases as $case) {
+                $case->stmts = $this->transformBody($case->stmts);
+            }
+        }
     }
 
     /**
@@ -1292,5 +1375,95 @@ CODE_SAMPLE,
         }
 
         return false;
+    }
+
+    /**
+     * Handle `use function Pest\...` imports — remove Pest entries, keep others.
+     *
+     * @return Node|NodeVisitor::REMOVE_NODE|null
+     */
+    private function refactorPestFunctionUse(Use_ $node): mixed
+    {
+        $filtered = [];
+        foreach ($node->uses as $use) {
+            if (! str_starts_with($use->name->toString(), 'Pest\\')) {
+                $filtered[] = $use;
+            }
+        }
+
+        if ($filtered === []) {
+            return NodeVisitor::REMOVE_NODE;
+        }
+
+        if (count($filtered) < count($node->uses)) {
+            $node->uses = $filtered;
+            return $node;
+        }
+
+        return null;
+    }
+
+    /**
+     * Recursively rewrite fake() calls to \Faker\Factory::create() in a statement.
+     */
+    private function transformFakeCallsInStmt(Stmt $stmt): Stmt
+    {
+        $this->transformFakeCallsInNode($stmt);
+
+        return $stmt;
+    }
+
+    /**
+     * Recursively find and rewrite fake() FuncCall nodes in-place.
+     */
+    private function transformFakeCallsInNode(Node $node): void
+    {
+        foreach ($node->getSubNodeNames() as $name) {
+            $subNode = $node->$name;
+
+            if ($subNode instanceof Node) {
+                if ($subNode instanceof FuncCall && $this->isFakeCall($subNode)) {
+                    $node->$name = $this->buildFakerFactoryCreate($subNode);
+                } else {
+                    $this->transformFakeCallsInNode($subNode);
+                }
+            } elseif (is_array($subNode)) {
+                foreach ($subNode as $key => $item) {
+                    if ($item instanceof Node) {
+                        if ($item instanceof FuncCall && $this->isFakeCall($item)) {
+                            $node->$name[$key] = $this->buildFakerFactoryCreate($item);
+                        } else {
+                            $this->transformFakeCallsInNode($item);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Check if a FuncCall is a fake() call (bare or namespaced Pest\Faker\fake).
+     */
+    private function isFakeCall(FuncCall $call): bool
+    {
+        if (! $call->name instanceof Name) {
+            return false;
+        }
+
+        $name = $call->name->toString();
+
+        return $name === 'fake' || $name === 'Pest\\Faker\\fake';
+    }
+
+    /**
+     * Build a \Faker\Factory::create(...) static call to replace fake(...).
+     */
+    private function buildFakerFactoryCreate(FuncCall $fakeCall): StaticCall
+    {
+        return new StaticCall(
+            new FullyQualified('Faker\\Factory'),
+            'create',
+            $fakeCall->args
+        );
     }
 }

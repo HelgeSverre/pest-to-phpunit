@@ -16,7 +16,9 @@ class TestWithTryCatchTest extends \PHPUnit\Framework\TestCase
     {
         try {
             riskyOperation();
+            $this->assertTrue(true);
         } catch (Exception $e) {
+            $this->assertContains('error', $e->getMessage());
         }
     }
 }

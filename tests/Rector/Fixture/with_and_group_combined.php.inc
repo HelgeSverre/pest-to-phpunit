@@ -8,7 +8,7 @@ class WithAndGroupCombinedTest extends \PHPUnit\Framework\TestCase
 {
     public static function test_parameterized_grouped_provider(): array
     {
-        return [1, 2, 3];
+        return [[1], [2], [3]];
     }
     #[\PHPUnit\Framework\Attributes\DataProvider('test_parameterized_grouped_provider')]
     #[\PHPUnit\Framework\Attributes\Group('math')]
