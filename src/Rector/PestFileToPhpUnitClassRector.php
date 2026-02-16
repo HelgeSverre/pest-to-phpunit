@@ -213,6 +213,41 @@ CODE_SAMPLE,
 
                 case 'uses':
                     $this->processUses($rootCall, $extendsClass, $traitUses);
+
+                    foreach ($chainModifiers as $modifier) {
+                        switch ($modifier['name']) {
+                            case 'beforeEach':
+                            case 'afterEach':
+                            case 'beforeAll':
+                            case 'afterAll':
+                                $hookCall = new FuncCall(
+                                    new Name($modifier['name']),
+                                    $modifier['args']
+                                );
+                                $hookMethod = $this->processHook($hookCall, $modifier['name']);
+                                if ($hookMethod !== null) {
+                                    $methods[] = $hookMethod;
+                                }
+                                break;
+
+                            case 'group':
+                                foreach ($modifier['args'] as $groupArg) {
+                                    if ($groupArg->value instanceof String_) {
+                                        $classAttributes[] = new AttributeGroup([
+                                            new Attribute(
+                                                new FullyQualified('PHPUnit\\Framework\\Attributes\\Group'),
+                                                [new Arg($groupArg->value)]
+                                            ),
+                                        ]);
+                                    }
+                                }
+                                break;
+
+                            case 'in':
+                                // Scopes which directories uses() applies to — not relevant for single-file conversion
+                                break;
+                        }
+                    }
                     break;
 
                 case 'dataset':
@@ -433,8 +468,10 @@ CODE_SAMPLE,
         $methodAttributes = [];
         $prependStmts = [];
         $skipReason = null;
+        $conditionalSkip = null;
         $todoReason = null;
         $providerMethod = null;
+        $repeatExpr = null;
 
         foreach ($chainModifiers as $modifier) {
             switch ($modifier['name']) {
@@ -455,9 +492,22 @@ CODE_SAMPLE,
                     break;
 
                 case 'skip':
-                    $skipReason = count($modifier['args']) > 0 && $modifier['args'][0]->value instanceof String_
-                        ? $modifier['args'][0]->value->value
-                        : 'Skipped';
+                    $argCount = count($modifier['args']);
+                    if ($argCount === 0) {
+                        $skipReason = 'Skipped';
+                    } elseif ($modifier['args'][0]->value instanceof String_) {
+                        $skipReason = $modifier['args'][0]->value->value;
+                    } else {
+                        $skipCondition = $modifier['args'][0]->value;
+                        // If the condition is a closure/arrow function, invoke it
+                        if ($skipCondition instanceof Closure || $skipCondition instanceof ArrowFunction) {
+                            $skipCondition = new FuncCall($skipCondition);
+                        }
+                        $skipReasonStr = ($argCount >= 2 && $modifier['args'][1]->value instanceof String_)
+                            ? $modifier['args'][1]->value->value
+                            : 'Skipped';
+                        $conditionalSkip = ['condition' => $skipCondition, 'reason' => $skipReasonStr];
+                    }
                     break;
 
                 case 'todo':
@@ -501,6 +551,21 @@ CODE_SAMPLE,
                         ]);
                     }
                     break;
+
+                case 'only':
+                    $methodAttributes[] = new AttributeGroup([
+                        new Attribute(
+                            new FullyQualified('PHPUnit\\Framework\\Attributes\\Group'),
+                            [new Arg(new String_('only'))]
+                        ),
+                    ]);
+                    break;
+
+                case 'repeat':
+                    if (count($modifier['args']) > 0) {
+                        $repeatExpr = $modifier['args'][0]->value;
+                    }
+                    break;
             }
         }
 
@@ -525,9 +590,36 @@ CODE_SAMPLE,
                     )
                 ),
             ];
+        } elseif ($conditionalSkip !== null) {
+            $body = $this->transformBody($body);
+            $skipStmt = new Expression(
+                new MethodCall(
+                    new Variable('this'),
+                    'markTestSkipped',
+                    [new Arg(new String_($conditionalSkip['reason']))]
+                )
+            );
+            $ifSkip = new Stmt\If_(
+                $conditionalSkip['condition'],
+                ['stmts' => [$skipStmt]]
+            );
+            $body = [$ifSkip, ...$body];
         } else {
             // Transform expect() chains in the body
             $body = $this->transformBody($body);
+        }
+
+        // Wrap body in for loop if ->repeat(N) was used
+        if ($repeatExpr !== null) {
+            $loopVar = new Variable('__repeat_i');
+            $body = [
+                new Stmt\For_([
+                    'init' => [new Assign($loopVar, new \PhpParser\Node\Scalar\Int_(0))],
+                    'cond' => [new Expr\BinaryOp\Smaller($loopVar, $repeatExpr)],
+                    'loop' => [new Expr\PostInc($loopVar)],
+                    'stmts' => $body,
+                ]),
+            ];
         }
 
         // Prepend throws expectations

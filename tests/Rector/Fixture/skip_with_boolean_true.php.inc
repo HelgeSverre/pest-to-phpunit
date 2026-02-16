@@ -9,6 +9,9 @@ class SkipWithBooleanTrueTest extends \PHPUnit\Framework\TestCase
 {
     public function test_conditionally_skipped(): void
     {
-        $this->markTestSkipped('Skipped');
+        if (true) {
+            $this->markTestSkipped('Skipped');
+        }
+        $this->assertTrue(true);
     }
 }

@@ -122,6 +122,10 @@ final class ExpectationMethodMap
         'json',
         'defer',
         'ray',
+        'tap',
+        'when',
+        'unless',
+        'pipe',
     ];
 
     public static function isTerminal(string $name): bool

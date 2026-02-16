@@ -172,6 +172,23 @@ final class ExpectChainUnwinder
                 continue;
             }
 
+            if ($name === 'tap') {
+                if (count($args) >= 1 && $args[0]->value instanceof \PhpParser\Node\Expr\Closure) {
+                    $tapClosure = $args[0]->value;
+                    foreach ($tapClosure->stmts as $tapStmt) {
+                        $stmts[] = $tapStmt;
+                    }
+                }
+                continue;
+            }
+
+            if ($name === 'when' || $name === 'unless' || $name === 'pipe') {
+                $comment = new Nop();
+                $comment->setAttribute('comments', [new Comment("// TODO(Pest): ->{$name}() requires manual conversion to PHPUnit")]);
+                $stmts[] = $comment;
+                continue;
+            }
+
             // Check if this is a terminal (assertion)
             $mapping = ExpectationMethodMap::getMapping($name);
             if ($mapping !== null) {
