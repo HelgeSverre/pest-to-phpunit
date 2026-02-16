@@ -567,8 +567,15 @@ CODE_SAMPLE,
 
         $closureArg = (count($call->args) >= 1 && $call->args[0] instanceof Arg) ? $call->args[0]->value : null;
         $closure = $closureArg instanceof Closure ? $closureArg : null;
+        $arrowFn = $closureArg instanceof ArrowFunction ? $closureArg : null;
 
-        $body = $closure !== null ? $closure->stmts : [];
+        if ($closure !== null) {
+            $body = $closure->stmts;
+        } elseif ($arrowFn !== null) {
+            $body = [new Expression($arrowFn->expr)];
+        } else {
+            $body = [];
+        }
         $body = $this->transformBody($body);
 
         $flags = Class_::MODIFIER_PROTECTED;

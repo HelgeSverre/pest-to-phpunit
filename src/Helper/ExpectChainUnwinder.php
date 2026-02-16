@@ -232,10 +232,8 @@ final class ExpectChainUnwinder
             }
 
             if ($name === 'toContainOnlyInstancesOf') {
-                $phpunitMethod = 'assertContainsOnlyInstancesOf';
-                if ($negated) {
-                    $negated = false;
-                }
+                $phpunitMethod = $negated ? 'assertContainsNotOnlyInstancesOf' : 'assertContainsOnlyInstancesOf';
+                $negated = false;
                 $stmts[] = self::buildAssertion($currentSubject, $phpunitMethod, 'expected_actual', $args);
                 continue;
             }
@@ -269,6 +267,72 @@ final class ExpectChainUnwinder
                         )
                     );
                 }
+                continue;
+            }
+
+            if ($name === 'toBeTruthy') {
+                $phpunitMethod = $negated ? 'assertEmpty' : 'assertNotEmpty';
+                $negated = false;
+                $stmts[] = self::buildAssertion($currentSubject, $phpunitMethod, 'actual_only', []);
+                continue;
+            }
+
+            if ($name === 'toBeFalsy') {
+                $phpunitMethod = $negated ? 'assertNotEmpty' : 'assertEmpty';
+                $negated = false;
+                $stmts[] = self::buildAssertion($currentSubject, $phpunitMethod, 'actual_only', []);
+                continue;
+            }
+
+            if ($name === 'toBeIn') {
+                $phpunitMethod = $negated ? 'assertNotContains' : 'assertContains';
+                $negated = false;
+                if (count($args) >= 1) {
+                    // Swap: assertContains($needle=$subject, $haystack=$arg)
+                    $stmts[] = new Stmt\Expression(
+                        new MethodCall(
+                            new Variable('this'),
+                            $phpunitMethod,
+                            [new Arg($currentSubject), $args[0]]
+                        )
+                    );
+                }
+                continue;
+            }
+
+            if ($name === 'toMatchObject') {
+                $phpunitMethod = $negated ? 'assertNotEquals' : 'assertEquals';
+                $negated = false;
+                $stmts[] = self::buildAssertion($currentSubject, $phpunitMethod, 'expected_actual', $args);
+                continue;
+            }
+
+            if ($name === 'toBeUppercase' || $name === 'toBeLowercase' || $name === 'toBeAlpha'
+                || $name === 'toBeAlphaNumeric' || $name === 'toBeSnakeCase' || $name === 'toBeKebabCase'
+                || $name === 'toBeCamelCase' || $name === 'toBeStudlyCase' || $name === 'toBeUuid'
+                || $name === 'toBeUrl' || $name === 'toBeDigits') {
+                $regexMap = [
+                    'toBeUppercase' => '/^[^a-z]*$/',
+                    'toBeLowercase' => '/^[^A-Z]*$/',
+                    'toBeAlpha' => '/^[a-zA-Z]+$/',
+                    'toBeAlphaNumeric' => '/^[a-zA-Z0-9]+$/',
+                    'toBeSnakeCase' => '/^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/',
+                    'toBeKebabCase' => '/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/',
+                    'toBeCamelCase' => '/^[a-z][a-zA-Z0-9]*$/',
+                    'toBeStudlyCase' => '/^[A-Z][a-zA-Z0-9]*$/',
+                    'toBeUuid' => '/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i',
+                    'toBeUrl' => '/^https?:\\/\\/.+/',
+                    'toBeDigits' => '/^\\d+$/',
+                ];
+                $regex = $regexMap[$name];
+                $phpunitMethod = $negated ? 'assertDoesNotMatchRegularExpression' : 'assertMatchesRegularExpression';
+                $negated = false;
+                $stmts[] = self::buildAssertion(
+                    $currentSubject,
+                    $phpunitMethod,
+                    'expected_actual',
+                    [new Arg(new \PhpParser\Node\Scalar\String_($regex))]
+                );
                 continue;
             }
 
