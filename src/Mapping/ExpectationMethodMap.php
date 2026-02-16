@@ -126,6 +126,11 @@ final class ExpectationMethodMap
         'when',
         'unless',
         'pipe',
+        'match',
+        'scoped',
+        'dd',
+        'ddWhen',
+        'ddUnless',
     ];
 
     public static function isTerminal(string $name): bool

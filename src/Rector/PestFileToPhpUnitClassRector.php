@@ -472,6 +472,7 @@ CODE_SAMPLE,
         $todoReason = null;
         $providerMethods = [];
         $repeatExpr = null;
+        $afterStmts = [];
         $withIndex = 0;
 
         foreach ($chainModifiers as $modifier) {
@@ -568,6 +569,14 @@ CODE_SAMPLE,
                         $repeatExpr = $modifier['args'][0]->value;
                     }
                     break;
+
+                case 'after':
+                    if (count($modifier['args']) > 0 && $modifier['args'][0]->value instanceof Closure) {
+                        $afterStmts = $modifier['args'][0]->value->stmts;
+                    } elseif (count($modifier['args']) > 0 && $modifier['args'][0]->value instanceof ArrowFunction) {
+                        $afterStmts = [new Expression($modifier['args'][0]->value->expr)];
+                    }
+                    break;
             }
         }
 
@@ -634,6 +643,17 @@ CODE_SAMPLE,
                     $body,
                     [],
                     new Stmt\Finally_($scopedAfterEach)
+                ),
+            ];
+        }
+
+        // Wrap in try/finally for ->after() hook
+        if ($afterStmts !== []) {
+            $body = [
+                new Stmt\TryCatch(
+                    $body,
+                    [],
+                    new Stmt\Finally_($afterStmts)
                 ),
             ];
         }

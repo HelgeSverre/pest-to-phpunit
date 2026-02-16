@@ -164,12 +164,31 @@ final class ExpectChainUnwinder
             }
 
             if ($name === 'each') {
-                $eachMode = true;
+                if (count($args) > 0) {
+                    $comment = new Nop();
+                    $comment->setAttribute('comments', [new Comment('// TODO(Pest): ->each(closure) requires manual conversion to PHPUnit')]);
+                    $stmts[] = $comment;
+                } else {
+                    $eachMode = true;
+                }
                 continue;
             }
 
-            if ($name === 'sequence' || $name === 'json' || $name === 'defer' || $name === 'ray') {
-                // Skip unsupported modifiers
+            if ($name === 'json' || $name === 'defer' || $name === 'ray' || $name === 'dd' || $name === 'ddWhen' || $name === 'ddUnless') {
+                continue;
+            }
+
+            if ($name === 'sequence') {
+                $comment = new Nop();
+                $comment->setAttribute('comments', [new Comment('// TODO(Pest): ->sequence() requires manual conversion to PHPUnit')]);
+                $stmts[] = $comment;
+                continue;
+            }
+
+            if ($name === 'match' || $name === 'scoped') {
+                $comment = new Nop();
+                $comment->setAttribute('comments', [new Comment("// TODO(Pest): ->{$name}() requires manual conversion to PHPUnit")]);
+                $stmts[] = $comment;
                 continue;
             }
 
@@ -194,6 +213,27 @@ final class ExpectChainUnwinder
                 $comment = new Nop();
                 $comment->setAttribute('comments', [new Comment("// TODO(Pest): ->{$name}() requires manual conversion to PHPUnit")]);
                 $stmts[] = $comment;
+                continue;
+            }
+
+            // Multi-arg toContain: toContain($a, $b, $c) → multiple assertContains
+            if ($name === 'toContain' && count($args) > 1) {
+                $phpunitMethod = $negated ? 'assertNotContains' : 'assertContains';
+                $negated = false;
+                foreach ($args as $singleArg) {
+                    $stmts[] = self::buildAssertion($currentSubject, $phpunitMethod, 'expected_actual', [$singleArg]);
+                }
+                continue;
+            }
+
+            // toMatchConstraint($constraint)
+            if ($name === 'toMatchConstraint') {
+                $negated = false;
+                if (count($args) >= 1) {
+                    $stmts[] = new Stmt\Expression(
+                        new MethodCall(new Variable('this'), 'assertThat', [new Arg($currentSubject), $args[0]])
+                    );
+                }
                 continue;
             }
 
@@ -231,13 +271,46 @@ final class ExpectChainUnwinder
                 continue;
             }
 
-            if ($name === 'toHaveProperty' || $name === 'toHaveProperties') {
-                // toHaveProperty($name, $value?) → assertTrue(property_exists(...)) or assertSame for value check
-                // Just emit a comment-based assertion for complex cases
+            if ($name === 'toHaveProperty') {
                 $phpunitMethod = $negated ? 'assertObjectNotHasProperty' : 'assertObjectHasProperty';
                 $negated = false;
                 if (count($args) >= 1) {
                     $stmts[] = self::buildAssertion($currentSubject, $phpunitMethod, 'expected_actual', [$args[0]]);
+                }
+                continue;
+            }
+
+            if ($name === 'toHaveProperties') {
+                $negated_local = $negated;
+                $negated = false;
+                if (count($args) >= 1 && $args[0]->value instanceof \PhpParser\Node\Expr\Array_) {
+                    $isAssociative = false;
+                    foreach ($args[0]->value->items as $item) {
+                        if ($item !== null && $item->key !== null) {
+                            $isAssociative = true;
+                            break;
+                        }
+                    }
+
+                    if ($isAssociative) {
+                        foreach ($args[0]->value->items as $item) {
+                            if ($item === null || $item->key === null) {
+                                continue;
+                            }
+                            $propAccess = new PropertyFetch($currentSubject, new Identifier($item->key->value));
+                            $assertMethod = $negated_local ? 'assertNotSame' : 'assertSame';
+                            $stmts[] = new Stmt\Expression(
+                                new MethodCall(new Variable('this'), $assertMethod, [new Arg($item->value), new Arg($propAccess)])
+                            );
+                        }
+                    } else {
+                        $phpunitMethod = $negated_local ? 'assertObjectNotHasProperty' : 'assertObjectHasProperty';
+                        foreach ($args[0]->value->items as $item) {
+                            if ($item !== null) {
+                                $stmts[] = self::buildAssertion($currentSubject, $phpunitMethod, 'expected_actual', [new Arg($item->value)]);
+                            }
+                        }
+                    }
                 }
                 continue;
             }
@@ -329,6 +402,33 @@ final class ExpectChainUnwinder
                 $phpunitMethod = $negated ? 'assertNotEquals' : 'assertEquals';
                 $negated = false;
                 $stmts[] = self::buildAssertion($currentSubject, $phpunitMethod, 'expected_actual', $args);
+                continue;
+            }
+
+            // toHaveXxxCaseKeys() — foreach over array_keys, assert regex on each
+            $keyCaseMap = [
+                'toHaveKebabCaseKeys' => '/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/',
+                'toHaveCamelCaseKeys' => '/^[a-z][a-zA-Z0-9]*$/',
+                'toHaveStudlyCaseKeys' => '/^[A-Z][a-zA-Z0-9]*$/',
+                'toHaveSnakeCaseKeys' => '/^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/',
+            ];
+            if (isset($keyCaseMap[$name])) {
+                $regex = $keyCaseMap[$name];
+                $phpunitMethod = $negated ? 'assertDoesNotMatchRegularExpression' : 'assertMatchesRegularExpression';
+                $negated = false;
+                $keyVar = new Variable('__key');
+                $assertStmt = new Stmt\Expression(
+                    new MethodCall(
+                        new Variable('this'),
+                        $phpunitMethod,
+                        [new Arg(new \PhpParser\Node\Scalar\String_($regex)), new Arg($keyVar)]
+                    )
+                );
+                $stmts[] = new Stmt\Foreach_(
+                    new FuncCall(new Name('array_keys'), [new Arg($currentSubject)]),
+                    $keyVar,
+                    ['stmts' => [$assertStmt]]
+                );
                 continue;
             }
 
@@ -531,25 +631,38 @@ final class ExpectChainUnwinder
             return $stmts;
         }
 
-        // expectException
         if (count($args) >= 1) {
-            $stmts[] = new Stmt\Expression(
-                new MethodCall(
-                    new Variable('this'),
-                    'expectException',
-                    [$args[0]]
-                )
-            );
+            $firstArgValue = $args[0]->value;
+
+            if ($firstArgValue instanceof String_) {
+                // toThrow('message') — string-only = exception message
+                $stmts[] = new Stmt\Expression(
+                    new MethodCall(new Variable('this'), 'expectExceptionMessage', [$args[0]])
+                );
+            } elseif ($firstArgValue instanceof \PhpParser\Node\Expr\New_) {
+                // toThrow(new Exception('msg')) — instance
+                $stmts[] = new Stmt\Expression(
+                    new MethodCall(new Variable('this'), 'expectException', [
+                        new Arg(new ClassConstFetch($firstArgValue->class, new Identifier('class'))),
+                    ])
+                );
+                if (count($firstArgValue->args) >= 1) {
+                    $stmts[] = new Stmt\Expression(
+                        new MethodCall(new Variable('this'), 'expectExceptionMessage', [$firstArgValue->args[0]])
+                    );
+                }
+            } else {
+                // toThrow(Exception::class) — class reference
+                $stmts[] = new Stmt\Expression(
+                    new MethodCall(new Variable('this'), 'expectException', [$args[0]])
+                );
+            }
         }
 
-        // expectExceptionMessage (second arg)
-        if (count($args) >= 2) {
+        // expectExceptionMessage (second arg, when first was class)
+        if (count($args) >= 2 && !($args[0]->value instanceof String_) && !($args[0]->value instanceof \PhpParser\Node\Expr\New_)) {
             $stmts[] = new Stmt\Expression(
-                new MethodCall(
-                    new Variable('this'),
-                    'expectExceptionMessage',
-                    [$args[1]]
-                )
+                new MethodCall(new Variable('this'), 'expectExceptionMessage', [$args[1]])
             );
         }
 
