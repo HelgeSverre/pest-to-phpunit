@@ -1,5 +1,8 @@
 # Pest to PHPUnit — Rector Extension
 
+> [!WARNING]
+> This project is experimental. It handles many common Pest patterns, but edge cases may produce incorrect output. Always review the generated code before committing.
+
 [![Latest Version on Packagist](https://img.shields.io/packagist/v/helgesverre/pest-to-phpunit.svg?style=flat-square)](https://packagist.org/packages/helgesverre/pest-to-phpunit)
 [![Total Downloads](https://img.shields.io/packagist/dt/helgesverre/pest-to-phpunit.svg?style=flat-square)](https://packagist.org/packages/helgesverre/pest-to-phpunit)
 [![PHP Version](https://img.shields.io/packagist/php-v/helgesverre/pest-to-phpunit.svg?style=flat-square)](https://packagist.org/packages/helgesverre/pest-to-phpunit)
