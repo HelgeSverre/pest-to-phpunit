@@ -457,7 +457,35 @@ expect($this->get('/'))->assertOk()->assertSee('Welcome');
 $this->get('/')->assertOk()->assertSee('Welcome');
 ```
 
-This works for all `assert*()` methods including `assertOk`, `assertCreated`, `assertSee`, `assertJson`, `assertRedirect`, `assertSet`, `assertDispatched`, `assertHasNoErrors`, etc. — no special mapping needed since these methods already throw PHPUnit assertions internally.
+This works automatically for **all** `assert*()` methods — no special mapping needed since these methods already throw PHPUnit assertions internally. Verified coverage includes:
+
+**Laravel TestResponse:**
+
+| Category | Methods |
+|---|---|
+| Status | `assertOk`, `assertCreated`, `assertNotFound`, `assertForbidden`, `assertUnauthorized`, `assertUnprocessable`, `assertStatus`, `assertSuccessful`, `assertNoContent` |
+| Content | `assertSee`, `assertDontSee`, `assertSeeText`, `assertSeeInOrder`, `assertSeeTextInOrder` |
+| JSON | `assertJson`, `assertExactJson`, `assertJsonFragment`, `assertJsonMissing`, `assertJsonStructure`, `assertJsonCount`, `assertJsonPath`, `assertJsonValidationErrors`, `assertJsonMissingValidationErrors` |
+| Redirects | `assertRedirect`, `assertRedirectContains`, `assertRedirectToRoute`, `assertLocation` |
+| Headers | `assertHeader`, `assertHeaderMissing` |
+| Validation | `assertValid`, `assertInvalid`, `assertSessionHasErrors` |
+| Session | `assertSessionHas`, `assertSessionHasAll`, `assertSessionMissing` |
+| Views | `assertViewIs`, `assertViewHas`, `assertViewHasAll`, `assertViewMissing` |
+| Cookies | `assertCookie`, `assertCookieMissing`, `assertCookieExpired` |
+| Downloads | `assertDownload` |
+
+**Livewire Testable:**
+
+| Category | Methods |
+|---|---|
+| Content | `assertSee`, `assertDontSee`, `assertSeeHtml`, `assertDontSeeHtml`, `assertSeeInOrder` |
+| Properties | `assertSet`, `assertNotSet`, `assertCount` |
+| Events | `assertDispatched`, `assertNotDispatched` |
+| Validation | `assertHasErrors`, `assertHasNoErrors` |
+| Navigation | `assertRedirect`, `assertRedirectToRoute`, `assertNoRedirect` |
+| Other | `assertStatus`, `assertForbidden`, `assertUnauthorized`, `assertViewHas`, `assertViewIs`, `assertFileDownloaded` |
+
+Non-assert methods in the chain (like `followRedirects()`, `set()`, `call()`) are preserved naturally as chained method calls.
 
 ### Not Supported
 
