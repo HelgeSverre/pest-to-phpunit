@@ -17,6 +17,7 @@ use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
 use PhpParser\Node\Name;
 use PhpParser\Node\Name\FullyQualified;
+use PhpParser\Node\Scalar\String_;
 use PhpParser\Node\Stmt;
 use PhpParser\Node\Stmt\Nop;
 
@@ -182,7 +183,14 @@ final class ExpectChainUnwinder
                 continue;
             }
 
-            if ($name === 'when' || $name === 'unless' || $name === 'pipe') {
+            if ($name === 'pipe') {
+                if (count($args) >= 1) {
+                    $currentSubject = new FuncCall($args[0]->value, [new Arg($currentSubject)]);
+                }
+                continue;
+            }
+
+            if ($name === 'when' || $name === 'unless') {
                 $comment = new Nop();
                 $comment->setAttribute('comments', [new Comment("// TODO(Pest): ->{$name}() requires manual conversion to PHPUnit")]);
                 $stmts[] = $comment;
@@ -475,11 +483,50 @@ final class ExpectChainUnwinder
         $stmts = [];
 
         if ($negated) {
-            // Wrap in try/catch, fail if exception thrown
-            $callStmt = new Stmt\Expression(
-                new FuncCall($callable)
+            // Determine the exception type to catch
+            if (count($args) >= 1 && $args[0]->value instanceof ClassConstFetch) {
+                $catchType = $args[0]->value->class;
+            } else {
+                $catchType = new FullyQualified('Throwable');
+            }
+
+            $exceptionVar = new Variable('__exception');
+
+            // Build: 'Expected no exception, but ' . get_class($__exception) . ' was thrown: ' . $__exception->getMessage()
+            $failMessage = new Expr\BinaryOp\Concat(
+                new Expr\BinaryOp\Concat(
+                    new Expr\BinaryOp\Concat(
+                        new String_('Expected no exception, but '),
+                        new FuncCall(new Name('get_class'), [new Arg($exceptionVar)])
+                    ),
+                    new String_(' was thrown: ')
+                ),
+                new MethodCall($exceptionVar, 'getMessage')
             );
-            $stmts[] = $callStmt;
+
+            $tryCatch = new Stmt\TryCatch(
+                // try body
+                [
+                    new Stmt\Expression(new FuncCall($callable)),
+                    new Stmt\Expression(
+                        new MethodCall(new Variable('this'), 'addToAssertionCount', [new Arg(new Node\Scalar\Int_(1))])
+                    ),
+                ],
+                // catches
+                [
+                    new Stmt\Catch_(
+                        [$catchType],
+                        $exceptionVar,
+                        [
+                            new Stmt\Expression(
+                                new MethodCall(new Variable('this'), 'fail', [new Arg($failMessage)])
+                            ),
+                        ]
+                    ),
+                ]
+            );
+
+            $stmts[] = $tryCatch;
 
             return $stmts;
         }

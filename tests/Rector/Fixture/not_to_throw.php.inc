@@ -11,6 +11,11 @@ class NotToThrowTest extends \PHPUnit\Framework\TestCase
 {
     public function test_does_not_throw(): void
     {
-        (fn () => doSomething())();
+        try {
+            (fn () => doSomething())();
+            $this->addToAssertionCount(1);
+        } catch (RuntimeException $__exception) {
+            $this->fail('Expected no exception, but ' . get_class($__exception) . ' was thrown: ' . $__exception->getMessage());
+        }
     }
 }

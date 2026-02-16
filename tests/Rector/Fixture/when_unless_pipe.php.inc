@@ -33,7 +33,6 @@ class WhenUnlessPipeTest extends \PHPUnit\Framework\TestCase
     }
     public function test_pipe_transforms(): void
     {
-        // TODO(Pest): ->pipe() requires manual conversion to PHPUnit
-        $this->assertSame(3, $items);
+        $this->assertSame(3, (fn ($v) => count($v))($items));
     }
 }

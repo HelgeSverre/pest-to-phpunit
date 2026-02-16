@@ -194,8 +194,8 @@ CODE_SAMPLE,
                     $result = $this->processTestCall($rootCall, $funcName, $chainModifiers, $dataProviders, $inlineProviderCounter);
                     if ($result !== null) {
                         $methods[] = $result['method'];
-                        if (isset($result['provider'])) {
-                            $dataProviders[] = $result['provider'];
+                        if (isset($result['providers'])) {
+                            array_push($dataProviders, ...$result['providers']);
                         }
                         $inlineProviderCounter = $result['providerCounter'];
                     }
@@ -261,8 +261,8 @@ CODE_SAMPLE,
                     $describeMethods = $this->processDescribe($rootCall, '', $dataProviders, $inlineProviderCounter, $chainModifiers);
                     foreach ($describeMethods as $dm) {
                         $methods[] = $dm['method'];
-                        if (isset($dm['provider'])) {
-                            $dataProviders[] = $dm['provider'];
+                        if (isset($dm['providers'])) {
+                            array_push($dataProviders, ...$dm['providers']);
                         }
                         $inlineProviderCounter = $dm['providerCounter'];
                     }
@@ -431,7 +431,7 @@ CODE_SAMPLE,
      * @param list<ClassMethod> $dataProviders
      * @return array{method: ClassMethod, provider?: ClassMethod, providerCounter: int}|null
      */
-    private function processTestCall(FuncCall $call, string $funcName, array $chainModifiers, array &$dataProviders, int $providerCounter, string $descriptionPrefix = ''): ?array
+    private function processTestCall(FuncCall $call, string $funcName, array $chainModifiers, array &$dataProviders, int $providerCounter, string $descriptionPrefix = '', array $scopedBeforeEach = [], array $scopedAfterEach = []): ?array
     {
         $args = $call->args;
         if (count($args) < 1) {
@@ -470,17 +470,19 @@ CODE_SAMPLE,
         $skipReason = null;
         $conditionalSkip = null;
         $todoReason = null;
-        $providerMethod = null;
+        $providerMethods = [];
         $repeatExpr = null;
+        $withIndex = 0;
 
         foreach ($chainModifiers as $modifier) {
             switch ($modifier['name']) {
                 case 'with':
-                    $result = $this->processWithModifier($modifier['args'], $methodName, $providerCounter);
+                    $result = $this->processWithModifier($modifier['args'], $methodName, $providerCounter, $withIndex);
+                    $withIndex++;
                     if ($result !== null) {
                         $methodAttributes[] = $result['attribute'];
                         if (isset($result['provider'])) {
-                            $providerMethod = $result['provider'];
+                            $providerMethods[] = $result['provider'];
                             $providerCounter = $result['counter'];
                         }
                     }
@@ -622,6 +624,20 @@ CODE_SAMPLE,
             ];
         }
 
+        // Inline describe-scoped beforeEach/afterEach hooks
+        if ($scopedBeforeEach !== []) {
+            $body = [...$scopedBeforeEach, ...$body];
+        }
+        if ($scopedAfterEach !== []) {
+            $body = [
+                new Stmt\TryCatch(
+                    $body,
+                    [],
+                    new Stmt\Finally_($scopedAfterEach)
+                ),
+            ];
+        }
+
         // Prepend throws expectations
         $body = [...$prependStmts, ...$body];
 
@@ -638,8 +654,8 @@ CODE_SAMPLE,
         );
 
         $result = ['method' => $method, 'providerCounter' => $providerCounter];
-        if ($providerMethod !== null) {
-            $result['provider'] = $providerMethod;
+        if ($providerMethods !== []) {
+            $result['providers'] = $providerMethods;
         }
 
         return $result;
@@ -787,7 +803,7 @@ CODE_SAMPLE,
      * @param list<ClassMethod> $dataProviders
      * @return list<array{method: ClassMethod, provider?: ClassMethod, providerCounter: int}>
      */
-    private function processDescribe(FuncCall $call, string $parentPrefix, array &$dataProviders, int $providerCounter, array $describeModifiers = []): array
+    private function processDescribe(FuncCall $call, string $parentPrefix, array &$dataProviders, int $providerCounter, array $describeModifiers = [], array $scopedBeforeEach = [], array $scopedAfterEach = []): array
     {
         $results = [];
         $args = $call->args;
@@ -808,6 +824,46 @@ CODE_SAMPLE,
 
         $prefix = $parentPrefix !== '' ? $parentPrefix . ' ' . $label : $label;
 
+        // Collect describe-scoped beforeEach/afterEach hooks
+        $localBeforeEach = [];
+        $localAfterEach = [];
+
+        foreach ($closure->stmts as $stmt) {
+            if (! $stmt instanceof Expression) {
+                continue;
+            }
+
+            $expr = $stmt->expr;
+            $mods = [];
+            $root = $this->unwrapChain($expr, $mods);
+
+            if (! $root instanceof FuncCall) {
+                continue;
+            }
+
+            $fn = $root->name instanceof Name ? $root->name->toString() : null;
+
+            if ($fn === 'beforeEach') {
+                $closureHookArg = (count($root->args) >= 1 && $root->args[0] instanceof Arg) ? $root->args[0]->value : null;
+                if ($closureHookArg instanceof Closure) {
+                    $localBeforeEach = array_merge($localBeforeEach, $closureHookArg->stmts);
+                } elseif ($closureHookArg instanceof ArrowFunction) {
+                    $localBeforeEach[] = new Expression($closureHookArg->expr);
+                }
+            } elseif ($fn === 'afterEach') {
+                $closureHookArg = (count($root->args) >= 1 && $root->args[0] instanceof Arg) ? $root->args[0]->value : null;
+                if ($closureHookArg instanceof Closure) {
+                    $localAfterEach = array_merge($localAfterEach, $closureHookArg->stmts);
+                } elseif ($closureHookArg instanceof ArrowFunction) {
+                    $localAfterEach[] = new Expression($closureHookArg->expr);
+                }
+            }
+        }
+
+        // Merge with inherited scoped hooks (outer first, then inner)
+        $mergedBeforeEach = array_merge($scopedBeforeEach, $localBeforeEach);
+        $mergedAfterEach = array_merge($scopedAfterEach, $localAfterEach);
+
         foreach ($closure->stmts as $stmt) {
             if (! $stmt instanceof Expression) {
                 continue;
@@ -823,16 +879,21 @@ CODE_SAMPLE,
 
             $funcName = $rootCall->name instanceof Name ? $rootCall->name->toString() : null;
 
+            // Skip hook calls — already collected above
+            if ($funcName === 'beforeEach' || $funcName === 'afterEach' || $funcName === 'beforeAll' || $funcName === 'afterAll') {
+                continue;
+            }
+
             if ($funcName === 'test' || $funcName === 'it') {
                 $mergedModifiers = array_merge($describeModifiers, $chainModifiers);
-                $result = $this->processTestCall($rootCall, $funcName, $mergedModifiers, $dataProviders, $providerCounter, $prefix);
+                $result = $this->processTestCall($rootCall, $funcName, $mergedModifiers, $dataProviders, $providerCounter, $prefix, $mergedBeforeEach, $mergedAfterEach);
                 if ($result !== null) {
                     $results[] = $result;
                     $providerCounter = $result['providerCounter'];
                 }
             } elseif ($funcName === 'describe') {
                 $nestedModifiers = array_merge($describeModifiers, $chainModifiers);
-                $nestedResults = $this->processDescribe($rootCall, $prefix, $dataProviders, $providerCounter, $nestedModifiers);
+                $nestedResults = $this->processDescribe($rootCall, $prefix, $dataProviders, $providerCounter, $nestedModifiers, $mergedBeforeEach, $mergedAfterEach);
                 foreach ($nestedResults as $nr) {
                     $results[] = $nr;
                     $providerCounter = $nr['providerCounter'];
@@ -895,7 +956,7 @@ CODE_SAMPLE,
      * @param list<Arg> $args
      * @return array{attribute: AttributeGroup, provider?: ClassMethod, counter: int}|null
      */
-    private function processWithModifier(array $args, string $testMethodName, int $counter): ?array
+    private function processWithModifier(array $args, string $testMethodName, int $counter, int $withIndex = 0): ?array
     {
         if (count($args) < 1) {
             return null;
@@ -919,7 +980,8 @@ CODE_SAMPLE,
 
         // ->with([...]) — inline data
         if ($firstArg instanceof Array_ || $firstArg instanceof Closure) {
-            $providerName = $testMethodName . '_provider';
+            $suffix = $withIndex > 0 ? '_provider_' . ($withIndex + 1) : '_provider';
+            $providerName = $testMethodName . $suffix;
             $counter++;
 
             $body = [];
