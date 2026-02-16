@@ -58,7 +58,7 @@ use App\Models\Order;
 class RealWorldServiceTest extends \Tests\TestCase
 {
     protected $service;
-    public static function test_charge_handles_currency_conversion_provider(): array
+    public static function charge_handles_currency_conversion_provider(): array
     {
         return [
             ['USD', 1.0],
@@ -87,7 +87,7 @@ class RealWorldServiceTest extends \Tests\TestCase
         $this->expectExceptionMessage('Amount must be positive');
         (fn () => $this->service->charge($order))();
     }
-    #[\PHPUnit\Framework\Attributes\DataProvider('test_charge_handles_currency_conversion_provider')]
+    #[\PHPUnit\Framework\Attributes\DataProvider('charge_handles_currency_conversion_provider')]
     public function test_charge_handles_currency_conversion(string $currency, float $rate): void
     {
         $order = Order::factory()->create(['total' => 100, 'currency' => $currency]);

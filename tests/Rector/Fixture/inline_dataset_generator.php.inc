@@ -13,13 +13,13 @@ test('processes items', function (int $value) {
 
 class InlineDatasetGeneratorTest extends \PHPUnit\Framework\TestCase
 {
-    public static function test_processes_items_provider(): iterable
+    public static function processes_items_provider(): iterable
     {
         yield [1];
         yield [2];
         yield [3];
     }
-    #[\PHPUnit\Framework\Attributes\DataProvider('test_processes_items_provider')]
+    #[\PHPUnit\Framework\Attributes\DataProvider('processes_items_provider')]
     public function test_processes_items(int $value): void
     {
         $this->assertIsInt($value);

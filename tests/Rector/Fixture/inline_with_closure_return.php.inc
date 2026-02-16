@@ -12,7 +12,7 @@ test('closure provider', function (int $n) {
 <?php
 class InlineWithClosureReturnTest extends \PHPUnit\Framework\TestCase
 {
-    public static function test_closure_provider_provider(): array
+    public static function closure_provider_provider(): array
     {
         return [
             [1],
@@ -20,7 +20,7 @@ class InlineWithClosureReturnTest extends \PHPUnit\Framework\TestCase
             [3],
         ];
     }
-    #[\PHPUnit\Framework\Attributes\DataProvider('test_closure_provider_provider')]
+    #[\PHPUnit\Framework\Attributes\DataProvider('closure_provider_provider')]
     public function test_closure_provider(int $n): void
     {
         $this->assertIsInt($n);

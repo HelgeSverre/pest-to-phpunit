@@ -11,7 +11,7 @@ test('doubles number', function (int $input, int $expected) {
 <?php
 class InlineWithArrayTest extends \PHPUnit\Framework\TestCase
 {
-    public static function test_doubles_number_provider(): array
+    public static function doubles_number_provider(): array
     {
         return [
             [1, 2],
@@ -19,7 +19,7 @@ class InlineWithArrayTest extends \PHPUnit\Framework\TestCase
             [3, 6],
         ];
     }
-    #[\PHPUnit\Framework\Attributes\DataProvider('test_doubles_number_provider')]
+    #[\PHPUnit\Framework\Attributes\DataProvider('doubles_number_provider')]
     public function test_doubles_number(int $input, int $expected): void
     {
         $this->assertSame($expected, $input * 2);

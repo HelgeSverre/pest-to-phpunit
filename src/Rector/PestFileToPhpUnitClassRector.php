@@ -46,13 +46,16 @@ use PhpParser\Node\Stmt\TraitUse;
 use PhpParser\Node\Stmt\GroupUse;
 use PhpParser\Node\Stmt\Use_;
 use PhpParser\NodeVisitor;
+use Rector\Contract\Rector\ConfigurableRectorInterface;
 use Rector\PhpParser\Node\FileNode;
 use Rector\Rector\AbstractRector;
 use Symplify\RuleDocGenerator\ValueObject\CodeSample\CodeSample;
 use Symplify\RuleDocGenerator\ValueObject\RuleDefinition;
 
-final class PestFileToPhpUnitClassRector extends AbstractRector
+final class PestFileToPhpUnitClassRector extends AbstractRector implements ConfigurableRectorInterface
 {
+    public const INFER_NAMESPACE = 'infer_namespace';
+
     private const PEST_FUNCTIONS = [
         'test', 'it', 'beforeEach', 'afterEach', 'beforeAll', 'afterAll',
         'uses', 'dataset', 'describe', 'covers', 'coversNothing', 'arch',
@@ -61,6 +64,16 @@ final class PestFileToPhpUnitClassRector extends AbstractRector
 
     /** @var array<string, bool> Track which files we've already processed */
     private array $processedFiles = [];
+
+    private bool $inferNamespace = false;
+
+    /**
+     * @param mixed[] $configuration
+     */
+    public function configure(array $configuration): void
+    {
+        $this->inferNamespace = (bool) ($configuration[self::INFER_NAMESPACE] ?? false);
+    }
 
     public function getRuleDefinition(): RuleDefinition
     {
@@ -380,14 +393,52 @@ CODE_SAMPLE,
             ]
         );
 
-        $class->namespacedName = new Name($className);
         $class->setAttribute('startLine', $node->getStartLine());
         $class->setAttribute('endLine', $node->getEndLine());
 
+        // If there's no namespace and inference is enabled, try to derive one from composer.json PSR-4 mappings
+        $inferredNamespace = false;
+        if ($namespace === null && $this->inferNamespace) {
+            $inferredNs = NameHelper::inferNamespaceFromPath($filePath);
+            if ($inferredNs !== null) {
+                // Separate declare statements (must stay before namespace) from other preserved stmts
+                $beforeNs = [];
+                $insideNs = [];
+                foreach ($preservedStmts as $s) {
+                    if ($s instanceof Stmt\Declare_) {
+                        $beforeNs[] = $s;
+                    } else {
+                        $insideNs[] = $s;
+                    }
+                }
+                $namespace = new Namespace_(new Name($inferredNs), [...$insideNs, $class]);
+                $preservedStmts = $beforeNs;
+                $inferredNamespace = true;
+                $class->namespacedName = new Name($inferredNs . '\\' . $className);
+            } else {
+                $class->namespacedName = new Name($className);
+            }
+        } elseif ($namespace !== null) {
+            $nsName = $namespace->name instanceof Name ? $namespace->name->toString() : '';
+            $class->namespacedName = new Name($nsName !== '' ? $nsName . '\\' . $className : $className);
+        } else {
+            $class->namespacedName = new Name($className);
+        }
+
         // Replace the namespace stmts or file stmts
-        if ($namespace !== null) {
+        if ($namespace !== null && ! $inferredNamespace) {
+            // Existing namespace — update its stmts in place
             $namespace->stmts = [...$preservedStmts, $class];
             $this->file->changeNewStmts($allStmts);
+        } elseif ($inferredNamespace) {
+            // Newly created namespace — replace all stmts
+            $newStmts = [...$preservedStmts, $namespace];
+            if ($fileNode !== null) {
+                $fileNode->stmts = $newStmts;
+                $this->file->changeNewStmts($allStmts);
+            } else {
+                $this->file->changeNewStmts($newStmts);
+            }
         } elseif ($fileNode !== null) {
             $fileNode->stmts = [...$preservedStmts, $class];
             $this->file->changeNewStmts($allStmts);
@@ -396,7 +447,11 @@ CODE_SAMPLE,
             $this->file->changeNewStmts($newStmts);
         }
 
-        // Return the class to replace this first pest expression
+        // Return the replacement for this first pest expression
+        if ($inferredNamespace) {
+            // Return namespace wrapping the class — replaces the pest expression at top level
+            return $namespace;
+        }
         return $class;
     }
 
@@ -1091,7 +1146,9 @@ CODE_SAMPLE,
         // ->with([...]) — inline data
         if ($firstArg instanceof Array_ || $firstArg instanceof Closure) {
             $suffix = $withIndex > 0 ? '_provider_' . ($withIndex + 1) : '_provider';
-            $providerName = $testMethodName . $suffix;
+            // Strip test_ prefix to avoid PHPUnit treating provider as a test method
+            $baseName = str_starts_with($testMethodName, 'test_') ? substr($testMethodName, 5) : $testMethodName;
+            $providerName = $baseName . $suffix;
             $counter++;
 
             $body = [];

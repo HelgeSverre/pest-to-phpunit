@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.0.7] - 2026-02-17
+
+### New Features
+- **Namespace inference from `composer.json` PSR-4 mappings** — When converting Pest files that have no `namespace` declaration (the common case), the tool can now automatically infer the correct namespace from `composer.json` `autoload-dev` / `autoload` PSR-4 mappings. This prevents class name collisions (e.g. `tests/Unit/ExampleTest.php` and `tests/Feature/ExampleTest.php` both producing `ExampleTest`). Enable via `withConfiguredRule`:
+  ```php
+  use HelgeSverre\PestToPhpUnit\Rector\PestFileToPhpUnitClassRector;
+
+  return RectorConfig::configure()
+      ->withConfiguredRule(PestFileToPhpUnitClassRector::class, [
+          PestFileToPhpUnitClassRector::INFER_NAMESPACE => true,
+      ]);
+  ```
+- **Configurable rule** — `PestFileToPhpUnitClassRector` now implements `ConfigurableRectorInterface`, allowing configuration via `withConfiguredRule()` in `rector.php`
+
+### Bug Fixes
+- **Data provider methods treated as test methods** — Provider methods were named `test_XXX_provider()` which PHPUnit also interpreted as test methods, causing "risky test" warnings. Provider names now strip the `test_` prefix (e.g. `it_adds_correctly_provider()`)
+
+### Testing
+- **353 tests, 3,600 assertions** — all passing
+- Verified end-to-end on a real Laravel project with Pest: 45 Pest tests converted to PHPUnit with zero failures
+
 ## [v0.0.6] - 2026-02-16
 
 ### Bug Fixes

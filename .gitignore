@@ -3,6 +3,7 @@ composer.lock
 .phpunit.result.cache
 .phpunit.cache/
 /.idea
+/dummy/
 
 # OS
 .DS_Store

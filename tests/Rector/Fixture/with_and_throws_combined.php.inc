@@ -6,11 +6,11 @@ test('throws per dataset', function (string $input) {
 <?php
 class WithAndThrowsCombinedTest extends \PHPUnit\Framework\TestCase
 {
-    public static function test_throws_per_dataset_provider(): array
+    public static function throws_per_dataset_provider(): array
     {
         return [[''], [null], [false]];
     }
-    #[\PHPUnit\Framework\Attributes\DataProvider('test_throws_per_dataset_provider')]
+    #[\PHPUnit\Framework\Attributes\DataProvider('throws_per_dataset_provider')]
     public function test_throws_per_dataset(string $input): void
     {
         $this->expectException(InvalidArgumentException::class);

@@ -36,6 +36,26 @@ return RectorConfig::configure()
     ]);
 ```
 
+#### Namespace inference (recommended)
+
+Pest test files typically have no `namespace` declaration. If your project uses PSR-4 autoloading for tests (e.g. `"Tests\\": "tests/"` in `composer.json`), enable namespace inference to automatically add the correct namespace to generated classes:
+
+```php
+<?php
+
+declare(strict_types=1);
+
+use Rector\Config\RectorConfig;
+use HelgeSverre\PestToPhpUnit\Rector\PestFileToPhpUnitClassRector;
+
+return RectorConfig::configure()
+    ->withConfiguredRule(PestFileToPhpUnitClassRector::class, [
+        PestFileToPhpUnitClassRector::INFER_NAMESPACE => true,
+    ]);
+```
+
+This reads your `composer.json` `autoload-dev` and `autoload` PSR-4 mappings to derive the namespace from the file path (e.g. `tests/Feature/ExampleTest.php` → `namespace Tests\Feature;`).
+
 ### 2. Run Rector
 
 ```bash

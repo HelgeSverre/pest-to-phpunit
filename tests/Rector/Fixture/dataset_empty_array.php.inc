@@ -6,11 +6,11 @@ test('empty dataset', function ($x) {
 <?php
 class DatasetEmptyArrayTest extends \PHPUnit\Framework\TestCase
 {
-    public static function test_empty_dataset_provider(): array
+    public static function empty_dataset_provider(): array
     {
         return [];
     }
-    #[\PHPUnit\Framework\Attributes\DataProvider('test_empty_dataset_provider')]
+    #[\PHPUnit\Framework\Attributes\DataProvider('empty_dataset_provider')]
     public function test_empty_dataset($x): void
     {
         $this->assertNull($x);
