@@ -2,7 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [v0.0.6] - 2026-02-16
+
+### Bug Fixes
+- **Negation not propagated to `expect()` chains in mixed custom expectation bodies** — When a custom expectation used `expect($this->value)->toBe()` (rather than `$this->toBe()`), call-site `->not->` negation was silently dropped, producing incorrect assertions
+- **Delegate body only inlined first statement** — Custom expectations with multiple `$this->toXxx()` statements (e.g. `$this->toBeString(); $this->toContain('@');`) only emitted the first assertion, silently dropping the rest
+- **`$this->value->method()` misclassified as delegation** — Expressions like `$this->value->assertOk()` were wrongly classified as `$this->toXxx()` delegation chains, producing empty output instead of routing through the complex body handler
+- **`not` modifier didn't toggle** — `$negated = true` instead of `$negated = !$negated` in the chain unwinder, breaking double-negation scenarios (e.g. `->not->toBeNotNullCustom()`)
+- **Unknown `return` expressions silently dropped** — Custom expectation bodies with `return (bool) $this->value` or similar non-chain returns were misclassified as `delegate`, producing empty output instead of routing through the complex body handler with a TODO comment
+- **PHPUnit config scanning fixture files** — `phpunit.xml` scanned all of `tests/` recursively, causing CI failures when PHPUnit tried to load Pest fixture files (e.g. `ExtractorManagerTest.php`) as test classes
+
+### Testing
+- **352 tests, 3,590 assertions** (up from 338 / 3,450)
+- 14 new fixtures covering: negated mixed bodies (return + expression), delegate multi-statement, default params (full + partial), extra args, `$this->value` with array access and property fetch, complex method-on-value (Laravel style), double negation, return-non-chain classification, `it()` variants (delegate, mixed, params)
+
+### CI
+- Added PHP 8.5 to test matrix (now 8.1–8.5)
+- Fixed `phpunit.xml` to exclude `tests/Rector/Fixture` directory
+
+## [v0.0.5] - 2026-02-16
 
 ### New Features
 - **Custom expectation inlining** — `expect()->extend('name', fn)` definitions are now parsed, registered, and inlined at call sites instead of emitting TODO comments. Supports delegating bodies (`$this->toBeGreaterThan(0)`), mixed bodies with `expect()` chains and local variables, `$this->value` substitution, closure parameter mapping, and arrow function bodies. Complex bodies that can't be fully inlined get best-effort conversion with a TODO comment.
@@ -20,7 +38,6 @@ All notable changes to this project will be documented in this file.
 - 15 new custom expectation fixtures: `custom_expect_simple_delegate`, `custom_expect_chained`, `custom_expect_with_params`, `custom_expect_this_value`, `custom_expect_negated`, `custom_expect_arrow_function`, `custom_expect_multiple_assertions`, `custom_expect_multiple_definitions`, `custom_expect_and_chain`, `custom_expect_composition`, `custom_expect_complex_body`, `custom_expect_each_modifier`, `custom_expect_file_extension`, `custom_expect_with_dataset`, `custom_expect_definition_only`
 - 12 new fixtures: `faker_plugin`, `faker_advanced`, `nested_expect`, `nested_expect_elseif`, `nested_expect_switch`, `nested_expect_finally`, `not_to_throw_no_class`, `after_arrow_function`, `describe_arrow_function_hooks`, `to_have_properties_non_assoc`, `to_throw_class_with_message`, `readme_faker`
 - 4 existing fixtures corrected (`test_early_return`, `test_with_foreach`, `test_with_if_statement`, `test_with_try_catch`)
-- Line coverage: 91.91% (up from 90.56%)
 
 ## [v0.0.4] - 2026-02-16
 

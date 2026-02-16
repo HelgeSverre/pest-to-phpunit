@@ -164,7 +164,7 @@ final class ExpectChainUnwinder
             $args = $part['args'];
 
             if ($name === 'not') {
-                $negated = true;
+                $negated = !$negated;
                 continue;
             }
 

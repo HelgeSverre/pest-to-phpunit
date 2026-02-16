@@ -102,6 +102,8 @@ final class CustomExpectationInliner
                         $hasExpectCall = true;
                         continue;
                     }
+                    // return <unknown expression> — arbitrary code
+                    $hasArbitraryCode = true;
                 }
                 continue;
             }
@@ -164,32 +166,36 @@ final class CustomExpectationInliner
      */
     private static function inlineDelegatingBody(array $body, Expr $subject, array $paramMap, bool $negated): array
     {
-        // Find the $this->toXxx()... chain expression
-        $chainExpr = null;
+        $stmts = [];
+
         foreach ($body as $stmt) {
-            if ($stmt instanceof Return_ && $stmt->expr !== null) {
+            if ($stmt instanceof Return_) {
+                if ($stmt->expr === null) {
+                    continue;
+                }
                 if ($stmt->expr instanceof Variable && $stmt->expr->name === 'this') {
                     continue;
                 }
-                $chainExpr = $stmt->expr;
-                break;
+                if (self::isThisExpectChain($stmt->expr)) {
+                    $rewritten = self::rewriteThisChainToExpect($stmt->expr, $subject, $paramMap);
+                    $unwound = ExpectChainUnwinder::unwind($rewritten, $negated);
+                    if ($unwound !== null) {
+                        array_push($stmts, ...$unwound);
+                    }
+                }
+                continue;
             }
             if ($stmt instanceof Expression && self::isThisExpectChain($stmt->expr)) {
-                $chainExpr = $stmt->expr;
-                break;
+                $rewritten = self::rewriteThisChainToExpect($stmt->expr, $subject, $paramMap);
+                $unwound = ExpectChainUnwinder::unwind($rewritten, $negated);
+                if ($unwound !== null) {
+                    array_push($stmts, ...$unwound);
+                }
+                continue;
             }
         }
 
-        if ($chainExpr === null) {
-            return [];
-        }
-
-        // Convert $this->toXxx($param) chain into expect($subject)->toXxx($param) chain
-        $rewritten = self::rewriteThisChainToExpect($chainExpr, $subject, $paramMap);
-
-        // Now unwind the expect() chain using the standard unwinder
-        $result = ExpectChainUnwinder::unwind($rewritten, $negated);
-        return $result ?? [];
+        return $stmts;
     }
 
     /**
@@ -336,11 +342,20 @@ final class CustomExpectationInliner
 
     /**
      * Check if an expression is a $this->toXxx()... chain (delegation to built-in expectations).
+     * Excludes chains that go through $this->value (those are value-access patterns, not delegation).
      */
     private static function isThisExpectChain(Expr $expr): bool
     {
         $current = $expr;
         while ($current instanceof MethodCall || $current instanceof PropertyFetch) {
+            // Detect $this->value in the chain — this is value access, not delegation
+            if ($current instanceof PropertyFetch
+                && $current->var instanceof Variable
+                && $current->var->name === 'this'
+                && $current->name instanceof Identifier
+                && $current->name->name === 'value') {
+                return false;
+            }
             $current = $current->var;
         }
         return $current instanceof Variable && $current->name === 'this';

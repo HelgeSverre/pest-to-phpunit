@@ -375,7 +375,8 @@ class DatasetTest extends \PHPUnit\Framework\TestCase
 | ----------------------------------- | :----: | ------------------------------------------------- |
 | `toStartWith` / `toEndWith`         |   ✅   | `assertStringStartsWith` / `assertStringEndsWith` |
 | `toMatch`                           |   ✅   | `assertMatchesRegularExpression`                  |
-| `toContain`                         |   ✅   | `assertContains`                                  |
+| `toContain` (string subject)        |   ✅   | `assertStringContainsString`                      |
+| `toContain` (array subject)         |   ✅   | `assertContains`                                  |
 | `toContain($a, $b, $c)` (multi-arg) |   ✅   | Multiple `assertContains` calls                   |
 
 #### Array / Collection Assertions
@@ -540,11 +541,46 @@ This works automatically for **all** `assert*()` methods — no special mapping 
 
 Non-assert methods in the chain (like `followRedirects()`, `set()`, `call()`) are preserved naturally as chained method calls.
 
+### Custom Expectations (`expect()->extend()`) ✅
+
+Custom expectations defined via `expect()->extend('name', fn)` are parsed and **inlined** at call sites:
+
+```php
+// Before
+expect()->extend('toBeWithinRange', function (int $min, int $max) {
+    return $this->toBeGreaterThanOrEqual($min)
+        ->toBeLessThanOrEqual($max);
+});
+
+test('value in range', function () {
+    expect(100)->toBeWithinRange(90, 110);
+});
+
+// After
+class CustomExpectTest extends \PHPUnit\Framework\TestCase
+{
+    public function test_value_in_range(): void
+    {
+        $this->assertGreaterThanOrEqual(90, 100);
+        $this->assertLessThanOrEqual(110, 100);
+    }
+}
+```
+
+Supports:
+- **Delegating bodies** — `$this->toBeGreaterThan(0)` chains (single or multiple statements)
+- **Mixed bodies** — local variables + `expect()` calls + `$this->value` access
+- **Arrow functions** — `fn () => $this->toBeInstanceOf(Collection::class)`
+- **Parameter substitution** — closure params mapped to call-site args, with default values
+- **Negation** — `->not->toCustom()` correctly inverts the inlined assertions
+- **Composition** — custom expectations calling other custom expectations
+- **`->each` modifier** — `expect([1,2,3])->each->toBePositive()`
+- **Complex bodies** — arbitrary code gets best-effort conversion with a `// TODO(Pest)` comment
+
 ### Not Supported
 
 | Pest Feature                                               | Notes                                                |
 | ---------------------------------------------------------- | ---------------------------------------------------- |
-| `expect()->extend('name', fn)`                             | Custom expectation macros — emits TODO               |
 | Higher-order test methods (e.g. `it('...')->assertTrue()`) | Not converted                                        |
 | `beforeAll`/`afterAll` inside `describe()`                 | No clean PHPUnit equivalent without multiple classes |
 

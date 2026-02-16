@@ -5,7 +5,8 @@
          colors="true">
     <testsuites>
         <testsuite name="default">
-            <directory>tests</directory>
+            <directory suffix="Test.php">tests/Rector</directory>
+            <exclude>tests/Rector/Fixture</exclude>
         </testsuite>
     </testsuites>
     <source>
