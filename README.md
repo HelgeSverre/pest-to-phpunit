@@ -383,12 +383,15 @@ class DatasetTest extends \PHPUnit\Framework\TestCase
 
 | Pest Assertion                   | Status | PHPUnit Equivalent                 |
 | -------------------------------- | :----: | ---------------------------------- |
-| `toHaveCount` / `toHaveLength`   |   ✅   | `assertCount`                      |
+| `toHaveCount`                    |   ✅   | `assertCount`                      |
+| `toHaveLength`                   |   ✅   | `assertSame($n, is_string($x) ? strlen($x) : count($x))` |
 | `toHaveKey`                      |   ✅   | `assertArrayHasKey`                |
 | `toHaveKeys(['a', 'b'])`         |   ✅   | Multiple `assertArrayHasKey` calls |
 | `toContainEqual`                 |   ✅   | `assertContainsEquals`             |
+| `toContainOnlyInstancesOf`       |   ✅   | `assertContainsOnlyInstancesOf`    |
 | `toHaveSameSize`                 |   ✅   | `assertSameSize`                   |
 | `toBeList`                       |   ✅   | `assertIsList`                     |
+| `toBeIn([$a, $b])`              |   ✅   | `assertContains($subject, $haystack)` |
 | `toMatchArray` / `toMatchObject` |   ✅   | `assertEquals`                     |
 
 #### Object Assertions
@@ -413,7 +416,7 @@ class DatasetTest extends \PHPUnit\Framework\TestCase
 
 | Pest Assertion                                                         | Status | PHPUnit Equivalent               |
 | ---------------------------------------------------------------------- | :----: | -------------------------------- |
-| `toBeUppercase` / `toBeLowercase`                                      |   ✅   | `assertMatchesRegularExpression` |
+| `toBeUppercase` / `toBeLowercase`                                      |   ✅   | `assertSame(strtoupper($x), $x)` / `assertSame(strtolower($x), $x)` |
 | `toBeAlpha` / `toBeAlphaNumeric` / `toBeDigits`                        |   ✅   | `assertMatchesRegularExpression` |
 | `toBeSnakeCase` / `toBeKebabCase` / `toBeCamelCase` / `toBeStudlyCase` |   ✅   | `assertMatchesRegularExpression` |
 | `toBeUuid` / `toBeUrl`                                                 |   ✅   | `assertMatchesRegularExpression` |
@@ -587,7 +590,7 @@ Supports:
 ## Limitations
 
 - **Not a 100% migration tool.** Some Pest features have no direct PHPUnit equivalent — these are converted to skipped tests or TODO comments prompting manual review.
-- **Assertion coverage** is broad (60+ mappings including negations) but doesn't cover every Pest plugin or custom expectation macro.
+- **Assertion coverage** is broad (60+ mappings including negations). Custom expectations via `expect()->extend()` are inlined automatically, though complex bodies may require manual review.
 - **Method naming** uses `snake_case` with a `test_` prefix. Long `describe()` chains can produce long method names.
 - **File structure** — the rule generates a class in-place. You may need to manually adjust namespaces or file locations.
 - **String format assertions** (`toBeSnakeCase`, `toBeUuid`, etc.) use regex approximations that may not match Pest's exact validation logic.
