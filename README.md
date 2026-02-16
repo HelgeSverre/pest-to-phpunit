@@ -445,13 +445,26 @@ These features emit a TODO comment because they require manual conversion:
 | `->when(...)` / `->unless(...)` | `// TODO(Pest): ->when()/->unless() requires manual conversion to PHPUnit` |
 | Unknown `->toXxx()` expectations | `// TODO(Pest): Unknown expectation ->toXxx() has no PHPUnit equivalent` |
 
+### Laravel / Livewire `assert*()` Methods ✅
+
+When `expect()` wraps a Laravel `TestResponse`, Livewire `Testable`, or any object with `assert*()` methods, they are emitted as **direct method calls** on the subject:
+
+```php
+// Before
+expect($this->get('/'))->assertOk()->assertSee('Welcome');
+
+// After
+$this->get('/')->assertOk()->assertSee('Welcome');
+```
+
+This works for all `assert*()` methods including `assertOk`, `assertCreated`, `assertSee`, `assertJson`, `assertRedirect`, `assertSet`, `assertDispatched`, `assertHasNoErrors`, etc. — no special mapping needed since these methods already throw PHPUnit assertions internally.
+
 ### Not Supported
 
 | Pest Feature | Notes |
 |---|---|
 | `expect()->extend('name', fn)` | Custom expectation macros — emits TODO |
 | Higher-order test methods (e.g. `it('...')->assertTrue()`) | Not converted |
-| Pest plugins (Livewire, Laravel, etc.) | Plugin-specific expectations emit TODO |
 | `beforeAll`/`afterAll` inside `describe()` | No clean PHPUnit equivalent without multiple classes |
 
 ## Limitations

@@ -152,6 +152,7 @@ final class ExpectChainUnwinder
         $stmts = [];
         $negated = false;
         $eachMode = false;
+        $assertChaining = false;
         $currentSubject = $subject;
 
         foreach ($parts as $part) {
@@ -476,6 +477,15 @@ final class ExpectChainUnwinder
                 continue;
             }
 
+            // assert*() methods on the subject (Laravel TestResponse, Livewire, etc.)
+            // Emit as direct method call statements: $subject->assertOk(), $subject->assertSee('x')
+            // Chained asserts like ->assertOk()->assertSee('x') become a single chained expression
+            if ($part['type'] === 'method' && str_starts_with($name, 'assert')) {
+                $currentSubject = new MethodCall($currentSubject, new Identifier($name), $args);
+                $assertChaining = true;
+                continue;
+            }
+
             // Unknown terminal expectation (starts with 'to') — emit TODO instead of silently treating as accessor
             if ($part['type'] === 'method' && str_starts_with($name, 'to') && !ExpectationMethodMap::isModifier($name)) {
                 $comment = new Nop();
@@ -497,6 +507,11 @@ final class ExpectChainUnwinder
                 $currentSubject = new MethodCall($currentSubject, new Identifier($name), $args);
                 continue;
             }
+        }
+
+        // If assert*() methods were chained, emit the accumulated expression as a statement
+        if ($assertChaining) {
+            $stmts[] = new Stmt\Expression($currentSubject);
         }
 
         return $stmts;
