@@ -260,190 +260,190 @@ class DatasetTest extends \PHPUnit\Framework\TestCase
 
 ### Core Constructs
 
-| Pest Feature | Status | PHPUnit Output |
-|---|:---:|---|
-| `test()` / `it()` | ✅ | `public function test_*(): void` |
-| `describe()` (nested, 4+ levels deep) | ✅ | Method name prefixing |
-| `beforeEach` / `afterEach` | ✅ | `setUp()` / `tearDown()` |
-| `beforeAll` / `afterAll` | ✅ | `setUpBeforeClass()` / `tearDownAfterClass()` |
-| `uses(TestCase::class)` | ✅ | `extends TestCase` |
-| `uses(Trait::class)` | ✅ | `use Trait;` |
-| `covers(Foo::class)` | ✅ | `#[CoversClass(Foo::class)]` |
-| `coversNothing()` | ✅ | `#[CoversNothing]` |
-| `dataset('name', [...])` | ✅ | Static data provider method |
-| `dataset('name', fn() => ...)` | ✅ | Generator-based provider |
-| Describe-scoped `beforeEach`/`afterEach` | ✅ | Inlined into test methods (try/finally for afterEach) |
-| Non-Pest code preserved | ✅ | Kept alongside generated class |
+| Pest Feature                             | Status | PHPUnit Output                                        |
+| ---------------------------------------- | :----: | ----------------------------------------------------- |
+| `test()` / `it()`                        |   ✅   | `public function test_*(): void`                      |
+| `describe()` (nested, 4+ levels deep)    |   ✅   | Method name prefixing                                 |
+| `beforeEach` / `afterEach`               |   ✅   | `setUp()` / `tearDown()`                              |
+| `beforeAll` / `afterAll`                 |   ✅   | `setUpBeforeClass()` / `tearDownAfterClass()`         |
+| `uses(TestCase::class)`                  |   ✅   | `extends TestCase`                                    |
+| `uses(Trait::class)`                     |   ✅   | `use Trait;`                                          |
+| `covers(Foo::class)`                     |   ✅   | `#[CoversClass(Foo::class)]`                          |
+| `coversNothing()`                        |   ✅   | `#[CoversNothing]`                                    |
+| `dataset('name', [...])`                 |   ✅   | Static data provider method                           |
+| `dataset('name', fn() => ...)`           |   ✅   | Generator-based provider                              |
+| Describe-scoped `beforeEach`/`afterEach` |   ✅   | Inlined into test methods (try/finally for afterEach) |
+| Non-Pest code preserved                  |   ✅   | Kept alongside generated class                        |
 
 ### Test Modifiers
 
-| Modifier | Status | PHPUnit Output |
-|---|:---:|---|
-| `->skip('reason')` | ✅ | `$this->markTestSkipped(...)` |
-| `->skip($condition, 'reason')` | ✅ | Conditional `if` + `markTestSkipped` |
-| `->todo()` | ✅ | `$this->markTestIncomplete('TODO')` |
-| `->group('name')` | ✅ | `#[Group('name')]` |
-| `->depends('test')` | ✅ | `#[Depends('test_*')]` |
-| `->covers(Foo::class)` | ✅ | `#[CoversClass(Foo::class)]` |
-| `->with('dataset')` | ✅ | `#[DataProvider('dataset')]` |
-| `->with([...])` | ✅ | Inline provider method + `#[DataProvider]` |
-| Multiple `->with()` (cross-join) | ✅ | Composed cross-join provider method |
-| `->throws(Exception::class)` | ✅ | `expectException` + `expectExceptionMessage` |
-| `->after(fn() => ...)` | ✅ | Test body wrapped in `try/finally` |
-| `->repeat(N)` | ✅ | `for` loop wrapping test body |
-| `->only()` | ✅ | `#[Group('only')]` |
+| Modifier                         | Status | PHPUnit Output                               |
+| -------------------------------- | :----: | -------------------------------------------- |
+| `->skip('reason')`               |   ✅   | `$this->markTestSkipped(...)`                |
+| `->skip($condition, 'reason')`   |   ✅   | Conditional `if` + `markTestSkipped`         |
+| `->todo()`                       |   ✅   | `$this->markTestIncomplete('TODO')`          |
+| `->group('name')`                |   ✅   | `#[Group('name')]`                           |
+| `->depends('test')`              |   ✅   | `#[Depends('test_*')]`                       |
+| `->covers(Foo::class)`           |   ✅   | `#[CoversClass(Foo::class)]`                 |
+| `->with('dataset')`              |   ✅   | `#[DataProvider('dataset')]`                 |
+| `->with([...])`                  |   ✅   | Inline provider method + `#[DataProvider]`   |
+| Multiple `->with()` (cross-join) |   ✅   | Composed cross-join provider method          |
+| `->throws(Exception::class)`     |   ✅   | `expectException` + `expectExceptionMessage` |
+| `->after(fn() => ...)`           |   ✅   | Test body wrapped in `try/finally`           |
+| `->repeat(N)`                    |   ✅   | `for` loop wrapping test body                |
+| `->only()`                       |   ✅   | `#[Group('only')]`                           |
 
 ### `expect()` Assertions
 
 #### Type Assertions
 
-| Pest Assertion | Status | PHPUnit Equivalent |
-|---|:---:|---|
-| `toBeString` / `toBeInt` / `toBeFloat` / `toBeArray` | ✅ | `assertIsString` / `assertIsInt` / `assertIsFloat` / `assertIsArray` |
-| `toBeBool` / `toBeCallable` / `toBeIterable` | ✅ | `assertIsBool` / `assertIsCallable` / `assertIsIterable` |
-| `toBeNumeric` / `toBeObject` / `toBeResource` / `toBeScalar` | ✅ | `assertIsNumeric` / `assertIsObject` / `assertIsResource` / `assertIsScalar` |
-| `toBeInstanceOf` | ✅ | `assertInstanceOf` |
+| Pest Assertion                                               | Status | PHPUnit Equivalent                                                           |
+| ------------------------------------------------------------ | :----: | ---------------------------------------------------------------------------- |
+| `toBeString` / `toBeInt` / `toBeFloat` / `toBeArray`         |   ✅   | `assertIsString` / `assertIsInt` / `assertIsFloat` / `assertIsArray`         |
+| `toBeBool` / `toBeCallable` / `toBeIterable`                 |   ✅   | `assertIsBool` / `assertIsCallable` / `assertIsIterable`                     |
+| `toBeNumeric` / `toBeObject` / `toBeResource` / `toBeScalar` |   ✅   | `assertIsNumeric` / `assertIsObject` / `assertIsResource` / `assertIsScalar` |
+| `toBeInstanceOf`                                             |   ✅   | `assertInstanceOf`                                                           |
 
 #### Value Assertions
 
-| Pest Assertion | Status | PHPUnit Equivalent |
-|---|:---:|---|
-| `toBe` | ✅ | `assertSame` |
-| `toEqual` | ✅ | `assertEquals` |
-| `toBeTrue` / `toBeFalse` | ✅ | `assertTrue` / `assertFalse` |
-| `toBeTruthy` / `toBeFalsy` | ✅ | `assertNotEmpty` / `assertEmpty` |
-| `toBeNull` | ✅ | `assertNull` |
-| `toBeEmpty` | ✅ | `assertEmpty` |
-| `toBeJson` | ✅ | `assertJson` |
-| `toBeNan` / `toBeFinite` / `toBeInfinite` | ✅ | `assertNan` / `assertIsFinite` / `assertIsInfinite` |
+| Pest Assertion                            | Status | PHPUnit Equivalent                                  |
+| ----------------------------------------- | :----: | --------------------------------------------------- |
+| `toBe`                                    |   ✅   | `assertSame`                                        |
+| `toEqual`                                 |   ✅   | `assertEquals`                                      |
+| `toBeTrue` / `toBeFalse`                  |   ✅   | `assertTrue` / `assertFalse`                        |
+| `toBeTruthy` / `toBeFalsy`                |   ✅   | `assertNotEmpty` / `assertEmpty`                    |
+| `toBeNull`                                |   ✅   | `assertNull`                                        |
+| `toBeEmpty`                               |   ✅   | `assertEmpty`                                       |
+| `toBeJson`                                |   ✅   | `assertJson`                                        |
+| `toBeNan` / `toBeFinite` / `toBeInfinite` |   ✅   | `assertNan` / `assertIsFinite` / `assertIsInfinite` |
 
 #### Comparison Assertions
 
-| Pest Assertion | Status | PHPUnit Equivalent |
-|---|:---:|---|
-| `toBeGreaterThan` / `toBeLessThan` | ✅ | `assertGreaterThan` / `assertLessThan` |
-| `toBeGreaterThanOrEqual` / `toBeLessThanOrEqual` | ✅ | `assertGreaterThanOrEqual` / `assertLessThanOrEqual` |
-| `toBeBetween($min, $max)` | ✅ | `assertGreaterThanOrEqual` + `assertLessThanOrEqual` |
-| `toEqualWithDelta` | ✅ | `assertEqualsWithDelta` |
-| `toEqualCanonicalizing` | ✅ | `assertEqualsCanonicalizing` |
+| Pest Assertion                                   | Status | PHPUnit Equivalent                                   |
+| ------------------------------------------------ | :----: | ---------------------------------------------------- |
+| `toBeGreaterThan` / `toBeLessThan`               |   ✅   | `assertGreaterThan` / `assertLessThan`               |
+| `toBeGreaterThanOrEqual` / `toBeLessThanOrEqual` |   ✅   | `assertGreaterThanOrEqual` / `assertLessThanOrEqual` |
+| `toBeBetween($min, $max)`                        |   ✅   | `assertGreaterThanOrEqual` + `assertLessThanOrEqual` |
+| `toEqualWithDelta`                               |   ✅   | `assertEqualsWithDelta`                              |
+| `toEqualCanonicalizing`                          |   ✅   | `assertEqualsCanonicalizing`                         |
 
 #### String Assertions
 
-| Pest Assertion | Status | PHPUnit Equivalent |
-|---|:---:|---|
-| `toStartWith` / `toEndWith` | ✅ | `assertStringStartsWith` / `assertStringEndsWith` |
-| `toMatch` | ✅ | `assertMatchesRegularExpression` |
-| `toContain` | ✅ | `assertContains` |
-| `toContain($a, $b, $c)` (multi-arg) | ✅ | Multiple `assertContains` calls |
+| Pest Assertion                      | Status | PHPUnit Equivalent                                |
+| ----------------------------------- | :----: | ------------------------------------------------- |
+| `toStartWith` / `toEndWith`         |   ✅   | `assertStringStartsWith` / `assertStringEndsWith` |
+| `toMatch`                           |   ✅   | `assertMatchesRegularExpression`                  |
+| `toContain`                         |   ✅   | `assertContains`                                  |
+| `toContain($a, $b, $c)` (multi-arg) |   ✅   | Multiple `assertContains` calls                   |
 
 #### Array / Collection Assertions
 
-| Pest Assertion | Status | PHPUnit Equivalent |
-|---|:---:|---|
-| `toHaveCount` / `toHaveLength` | ✅ | `assertCount` |
-| `toHaveKey` | ✅ | `assertArrayHasKey` |
-| `toHaveKeys(['a', 'b'])` | ✅ | Multiple `assertArrayHasKey` calls |
-| `toContainEqual` | ✅ | `assertContainsEquals` |
-| `toHaveSameSize` | ✅ | `assertSameSize` |
-| `toBeList` | ✅ | `assertIsList` |
-| `toMatchArray` / `toMatchObject` | ✅ | `assertEquals` |
+| Pest Assertion                   | Status | PHPUnit Equivalent                 |
+| -------------------------------- | :----: | ---------------------------------- |
+| `toHaveCount` / `toHaveLength`   |   ✅   | `assertCount`                      |
+| `toHaveKey`                      |   ✅   | `assertArrayHasKey`                |
+| `toHaveKeys(['a', 'b'])`         |   ✅   | Multiple `assertArrayHasKey` calls |
+| `toContainEqual`                 |   ✅   | `assertContainsEquals`             |
+| `toHaveSameSize`                 |   ✅   | `assertSameSize`                   |
+| `toBeList`                       |   ✅   | `assertIsList`                     |
+| `toMatchArray` / `toMatchObject` |   ✅   | `assertEquals`                     |
 
 #### Object Assertions
 
-| Pest Assertion | Status | PHPUnit Equivalent |
-|---|:---:|---|
-| `toHaveProperty('name')` | ✅ | `assertObjectHasProperty` |
-| `toHaveProperties(['a', 'b'])` | ✅ | Multiple `assertObjectHasProperty` calls |
-| `toHaveProperties(['name' => 'John'])` | ✅ | `assertSame` per key-value pair |
-| `toHaveMethod('foo')` | ✅ | `assertTrue(method_exists(...))` |
-| `toMatchConstraint($c)` | ✅ | `assertThat($subject, $constraint)` |
+| Pest Assertion                         | Status | PHPUnit Equivalent                       |
+| -------------------------------------- | :----: | ---------------------------------------- |
+| `toHaveProperty('name')`               |   ✅   | `assertObjectHasProperty`                |
+| `toHaveProperties(['a', 'b'])`         |   ✅   | Multiple `assertObjectHasProperty` calls |
+| `toHaveProperties(['name' => 'John'])` |   ✅   | `assertSame` per key-value pair          |
+| `toHaveMethod('foo')`                  |   ✅   | `assertTrue(method_exists(...))`         |
+| `toMatchConstraint($c)`                |   ✅   | `assertThat($subject, $constraint)`      |
 
 #### File / Directory Assertions
 
-| Pest Assertion | Status | PHPUnit Equivalent |
-|---|:---:|---|
-| `toBeFile` / `toBeDirectory` | ✅ | `assertFileExists` / `assertDirectoryExists` |
-| `toBeReadableFile` / `toBeWritableFile` | ✅ | `assertFileIsReadable` / `assertFileIsWritable` |
-| `toBeReadableDirectory` / `toBeWritableDirectory` | ✅ | `assertDirectoryIsReadable` / `assertDirectoryIsWritable` |
+| Pest Assertion                                    | Status | PHPUnit Equivalent                                        |
+| ------------------------------------------------- | :----: | --------------------------------------------------------- |
+| `toBeFile` / `toBeDirectory`                      |   ✅   | `assertFileExists` / `assertDirectoryExists`              |
+| `toBeReadableFile` / `toBeWritableFile`           |   ✅   | `assertFileIsReadable` / `assertFileIsWritable`           |
+| `toBeReadableDirectory` / `toBeWritableDirectory` |   ✅   | `assertDirectoryIsReadable` / `assertDirectoryIsWritable` |
 
 #### String Format Assertions (via regex)
 
-| Pest Assertion | Status | PHPUnit Equivalent |
-|---|:---:|---|
-| `toBeUppercase` / `toBeLowercase` | ✅ | `assertMatchesRegularExpression` |
-| `toBeAlpha` / `toBeAlphaNumeric` / `toBeDigits` | ✅ | `assertMatchesRegularExpression` |
-| `toBeSnakeCase` / `toBeKebabCase` / `toBeCamelCase` / `toBeStudlyCase` | ✅ | `assertMatchesRegularExpression` |
-| `toBeUuid` / `toBeUrl` | ✅ | `assertMatchesRegularExpression` |
+| Pest Assertion                                                         | Status | PHPUnit Equivalent               |
+| ---------------------------------------------------------------------- | :----: | -------------------------------- |
+| `toBeUppercase` / `toBeLowercase`                                      |   ✅   | `assertMatchesRegularExpression` |
+| `toBeAlpha` / `toBeAlphaNumeric` / `toBeDigits`                        |   ✅   | `assertMatchesRegularExpression` |
+| `toBeSnakeCase` / `toBeKebabCase` / `toBeCamelCase` / `toBeStudlyCase` |   ✅   | `assertMatchesRegularExpression` |
+| `toBeUuid` / `toBeUrl`                                                 |   ✅   | `assertMatchesRegularExpression` |
 
 #### Array Key Format Assertions
 
-| Pest Assertion | Status | PHPUnit Equivalent |
-|---|:---:|---|
-| `toHaveSnakeCaseKeys` / `toHaveKebabCaseKeys` | ✅ | `foreach (array_keys(...))` + regex assert |
-| `toHaveCamelCaseKeys` / `toHaveStudlyCaseKeys` | ✅ | `foreach (array_keys(...))` + regex assert |
+| Pest Assertion                                 | Status | PHPUnit Equivalent                         |
+| ---------------------------------------------- | :----: | ------------------------------------------ |
+| `toHaveSnakeCaseKeys` / `toHaveKebabCaseKeys`  |   ✅   | `foreach (array_keys(...))` + regex assert |
+| `toHaveCamelCaseKeys` / `toHaveStudlyCaseKeys` |   ✅   | `foreach (array_keys(...))` + regex assert |
 
 #### Exception Assertions
 
-| Pest Assertion | Status | PHPUnit Equivalent |
-|---|:---:|---|
-| `toThrow(Exception::class)` | ✅ | `expectException` + invoke callable |
-| `toThrow(Exception::class, 'msg')` | ✅ | `expectException` + `expectExceptionMessage` |
-| `toThrow(new Exception('msg'))` | ✅ | `expectException` + `expectExceptionMessage` |
-| `toThrow('message')` | ✅ | `expectExceptionMessage` |
-| `not->toThrow()` | ✅ | `try/catch` with `$this->fail()` on exception |
+| Pest Assertion                     | Status | PHPUnit Equivalent                            |
+| ---------------------------------- | :----: | --------------------------------------------- |
+| `toThrow(Exception::class)`        |   ✅   | `expectException` + invoke callable           |
+| `toThrow(Exception::class, 'msg')` |   ✅   | `expectException` + `expectExceptionMessage`  |
+| `toThrow(new Exception('msg'))`    |   ✅   | `expectException` + `expectExceptionMessage`  |
+| `toThrow('message')`               |   ✅   | `expectExceptionMessage`                      |
+| `not->toThrow()`                   |   ✅   | `try/catch` with `$this->fail()` on exception |
 
 #### Laravel-Specific Assertions
 
-| Pest Assertion | Status | PHPUnit Equivalent |
-|---|:---:|---|
-| `toBeCollection` | ✅ | `assertInstanceOf(Collection::class)` |
-| `toBeModel` | ✅ | `assertInstanceOf(Model::class)` |
-| `toBeEloquentCollection` | ✅ | `assertInstanceOf(EloquentCollection::class)` |
+| Pest Assertion           | Status | PHPUnit Equivalent                            |
+| ------------------------ | :----: | --------------------------------------------- |
+| `toBeCollection`         |   ✅   | `assertInstanceOf(Collection::class)`         |
+| `toBeModel`              |   ✅   | `assertInstanceOf(Model::class)`              |
+| `toBeEloquentCollection` |   ✅   | `assertInstanceOf(EloquentCollection::class)` |
 
 ### Chain Modifiers
 
-| Modifier | Status | Behavior |
-|---|:---:|---|
-| `->not->*` | ✅ | Negated equivalents (`assertNotSame`, `assertNotNull`, etc.) |
-| `->and($subject)` | ✅ | Split into multiple assertion groups |
-| `->each->*` (no closure) | ✅ | `foreach` loop with assertion per item |
-| `->tap(fn() => ...)` | ✅ | Closure body inlined |
-| `->pipe(fn($v) => ...)` | ✅ | Subject transformed: `(fn($v) => ...)($subject)` |
-| Property access (e.g. `->name`) | ✅ | `$subject->name` |
-| Method access (e.g. `->count()`) | ✅ | `$subject->count()` |
+| Modifier                         | Status | Behavior                                                     |
+| -------------------------------- | :----: | ------------------------------------------------------------ |
+| `->not->*`                       |   ✅   | Negated equivalents (`assertNotSame`, `assertNotNull`, etc.) |
+| `->and($subject)`                |   ✅   | Split into multiple assertion groups                         |
+| `->each->*` (no closure)         |   ✅   | `foreach` loop with assertion per item                       |
+| `->tap(fn() => ...)`             |   ✅   | Closure body inlined                                         |
+| `->pipe(fn($v) => ...)`          |   ✅   | Subject transformed: `(fn($v) => ...)($subject)`             |
+| Property access (e.g. `->name`)  |   ✅   | `$subject->name`                                             |
+| Method access (e.g. `->count()`) |   ✅   | `$subject->count()`                                          |
 
 ### Silently Stripped (debug/dev-only)
 
 These Pest methods are removed from the chain without emitting any output:
 
-| Modifier | Reason |
-|---|---|
-| `->dd()` / `->ddWhen()` / `->ddUnless()` | Debug — dump and die |
-| `->ray()` | Debug — Ray debugger |
-| `->json()` | Output modifier — no assertion equivalent |
-| `->defer()` | Timing modifier — no assertion equivalent |
+| Modifier                                 | Reason                                    |
+| ---------------------------------------- | ----------------------------------------- |
+| `->dd()` / `->ddWhen()` / `->ddUnless()` | Debug — dump and die                      |
+| `->ray()`                                | Debug — Ray debugger                      |
+| `->json()`                               | Output modifier — no assertion equivalent |
+| `->defer()`                              | Timing modifier — no assertion equivalent |
 
 ### Converted to `markTestSkipped` ⚠️
 
 These features have no PHPUnit equivalent and are converted to skipped tests with a review comment:
 
-| Pest Feature | PHPUnit Output |
-|---|---|
-| `arch()` tests | `$this->markTestSkipped('Arch test not supported in PHPUnit: ...')` |
+| Pest Feature                                        | PHPUnit Output                                                      |
+| --------------------------------------------------- | ------------------------------------------------------------------- |
+| `arch()` tests                                      | `$this->markTestSkipped('Arch test not supported in PHPUnit: ...')` |
 | Higher-order `it('...')->expect([...])->toBeUsed()` | `$this->markTestSkipped('Arch test not supported in PHPUnit: ...')` |
 
 ### Emits `// TODO` Comment ⚠️
 
 These features emit a TODO comment because they require manual conversion:
 
-| Pest Feature | TODO Comment |
-|---|---|
-| `->sequence(...)` | `// TODO(Pest): ->sequence() requires manual conversion to PHPUnit` |
-| `->match(...)` | `// TODO(Pest): ->match() requires manual conversion to PHPUnit` |
-| `->scoped(...)` | `// TODO(Pest): ->scoped() requires manual conversion to PHPUnit` |
-| `->each(fn() => ...)` (with closure) | `// TODO(Pest): ->each(closure) requires manual conversion to PHPUnit` |
-| `->when(...)` / `->unless(...)` | `// TODO(Pest): ->when()/->unless() requires manual conversion to PHPUnit` |
-| Unknown `->toXxx()` expectations | `// TODO(Pest): Unknown expectation ->toXxx() has no PHPUnit equivalent` |
+| Pest Feature                         | TODO Comment                                                               |
+| ------------------------------------ | -------------------------------------------------------------------------- |
+| `->sequence(...)`                    | `// TODO(Pest): ->sequence() requires manual conversion to PHPUnit`        |
+| `->match(...)`                       | `// TODO(Pest): ->match() requires manual conversion to PHPUnit`           |
+| `->scoped(...)`                      | `// TODO(Pest): ->scoped() requires manual conversion to PHPUnit`          |
+| `->each(fn() => ...)` (with closure) | `// TODO(Pest): ->each(closure) requires manual conversion to PHPUnit`     |
+| `->when(...)` / `->unless(...)`      | `// TODO(Pest): ->when()/->unless() requires manual conversion to PHPUnit` |
+| Unknown `->toXxx()` expectations     | `// TODO(Pest): Unknown expectation ->toXxx() has no PHPUnit equivalent`   |
 
 ### Laravel / Livewire `assert*()` Methods ✅
 
@@ -461,39 +461,39 @@ This works automatically for **all** `assert*()` methods — no special mapping 
 
 **Laravel TestResponse:**
 
-| Category | Methods |
-|---|---|
-| Status | `assertOk`, `assertCreated`, `assertNotFound`, `assertForbidden`, `assertUnauthorized`, `assertUnprocessable`, `assertStatus`, `assertSuccessful`, `assertNoContent` |
-| Content | `assertSee`, `assertDontSee`, `assertSeeText`, `assertSeeInOrder`, `assertSeeTextInOrder` |
-| JSON | `assertJson`, `assertExactJson`, `assertJsonFragment`, `assertJsonMissing`, `assertJsonStructure`, `assertJsonCount`, `assertJsonPath`, `assertJsonValidationErrors`, `assertJsonMissingValidationErrors` |
-| Redirects | `assertRedirect`, `assertRedirectContains`, `assertRedirectToRoute`, `assertLocation` |
-| Headers | `assertHeader`, `assertHeaderMissing` |
-| Validation | `assertValid`, `assertInvalid`, `assertSessionHasErrors` |
-| Session | `assertSessionHas`, `assertSessionHasAll`, `assertSessionMissing` |
-| Views | `assertViewIs`, `assertViewHas`, `assertViewHasAll`, `assertViewMissing` |
-| Cookies | `assertCookie`, `assertCookieMissing`, `assertCookieExpired` |
-| Downloads | `assertDownload` |
+| Category   | Methods                                                                                                                                                                                                   |
+| ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Status     | `assertOk`, `assertCreated`, `assertNotFound`, `assertForbidden`, `assertUnauthorized`, `assertUnprocessable`, `assertStatus`, `assertSuccessful`, `assertNoContent`                                      |
+| Content    | `assertSee`, `assertDontSee`, `assertSeeText`, `assertSeeInOrder`, `assertSeeTextInOrder`                                                                                                                 |
+| JSON       | `assertJson`, `assertExactJson`, `assertJsonFragment`, `assertJsonMissing`, `assertJsonStructure`, `assertJsonCount`, `assertJsonPath`, `assertJsonValidationErrors`, `assertJsonMissingValidationErrors` |
+| Redirects  | `assertRedirect`, `assertRedirectContains`, `assertRedirectToRoute`, `assertLocation`                                                                                                                     |
+| Headers    | `assertHeader`, `assertHeaderMissing`                                                                                                                                                                     |
+| Validation | `assertValid`, `assertInvalid`, `assertSessionHasErrors`                                                                                                                                                  |
+| Session    | `assertSessionHas`, `assertSessionHasAll`, `assertSessionMissing`                                                                                                                                         |
+| Views      | `assertViewIs`, `assertViewHas`, `assertViewHasAll`, `assertViewMissing`                                                                                                                                  |
+| Cookies    | `assertCookie`, `assertCookieMissing`, `assertCookieExpired`                                                                                                                                              |
+| Downloads  | `assertDownload`                                                                                                                                                                                          |
 
 **Livewire Testable:**
 
-| Category | Methods |
-|---|---|
-| Content | `assertSee`, `assertDontSee`, `assertSeeHtml`, `assertDontSeeHtml`, `assertSeeInOrder` |
-| Properties | `assertSet`, `assertNotSet`, `assertCount` |
-| Events | `assertDispatched`, `assertNotDispatched` |
-| Validation | `assertHasErrors`, `assertHasNoErrors` |
-| Navigation | `assertRedirect`, `assertRedirectToRoute`, `assertNoRedirect` |
-| Other | `assertStatus`, `assertForbidden`, `assertUnauthorized`, `assertViewHas`, `assertViewIs`, `assertFileDownloaded` |
+| Category   | Methods                                                                                                          |
+| ---------- | ---------------------------------------------------------------------------------------------------------------- |
+| Content    | `assertSee`, `assertDontSee`, `assertSeeHtml`, `assertDontSeeHtml`, `assertSeeInOrder`                           |
+| Properties | `assertSet`, `assertNotSet`, `assertCount`                                                                       |
+| Events     | `assertDispatched`, `assertNotDispatched`                                                                        |
+| Validation | `assertHasErrors`, `assertHasNoErrors`                                                                           |
+| Navigation | `assertRedirect`, `assertRedirectToRoute`, `assertNoRedirect`                                                    |
+| Other      | `assertStatus`, `assertForbidden`, `assertUnauthorized`, `assertViewHas`, `assertViewIs`, `assertFileDownloaded` |
 
 Non-assert methods in the chain (like `followRedirects()`, `set()`, `call()`) are preserved naturally as chained method calls.
 
 ### Not Supported
 
-| Pest Feature | Notes |
-|---|---|
-| `expect()->extend('name', fn)` | Custom expectation macros — emits TODO |
-| Higher-order test methods (e.g. `it('...')->assertTrue()`) | Not converted |
-| `beforeAll`/`afterAll` inside `describe()` | No clean PHPUnit equivalent without multiple classes |
+| Pest Feature                                               | Notes                                                |
+| ---------------------------------------------------------- | ---------------------------------------------------- |
+| `expect()->extend('name', fn)`                             | Custom expectation macros — emits TODO               |
+| Higher-order test methods (e.g. `it('...')->assertTrue()`) | Not converted                                        |
+| `beforeAll`/`afterAll` inside `describe()`                 | No clean PHPUnit equivalent without multiple classes |
 
 ## Limitations
 

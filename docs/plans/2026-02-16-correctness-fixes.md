@@ -17,6 +17,7 @@
 **Problem:** `expect(fn() => ...)->toThrow()` invokes the callable but sets NO exception expectation. The test passes even if nothing throws — a **false positive**.
 
 **Files:**
+
 - Modify: `src/Helper/ExpectChainUnwinder.php` — `buildToThrow()` method (~line 649)
 - Create: `tests/Rector/Fixture/to_throw_no_args.php.inc`
 
@@ -25,6 +26,7 @@
 ```
 tests/Rector/Fixture/to_throw_no_args.php.inc
 ```
+
 ```php
 <?php
 test('throws something', function () {
@@ -69,6 +71,7 @@ if (count($args) === 0) {
 **Problem:** `toThrow('RuntimeException')` becomes `expectExceptionMessage('RuntimeException')` instead of `expectException(RuntimeException::class)`. Pest treats strings ending in `Exception` or `Error` (or containing `\`) as class names.
 
 **Files:**
+
 - Modify: `src/Helper/ExpectChainUnwinder.php` — `buildToThrow()` method (~line 652)
 - Create: `tests/Rector/Fixture/to_throw_string_class.php.inc`
 
@@ -77,6 +80,7 @@ if (count($args) === 0) {
 ```
 tests/Rector/Fixture/to_throw_string_class.php.inc
 ```
+
 ```php
 <?php
 test('throws by class string', function () {
@@ -154,6 +158,7 @@ Also handle the second arg for class-string + message: after the class-string bl
 **Problem:** `toHaveLength` maps to `assertCount` which will TypeError on strings in PHP 8+. Pest's `toHaveLength()` uses `strlen()` for strings and `count()` for countables.
 
 **Files:**
+
 - Modify: `src/Helper/ExpectChainUnwinder.php` — add special case before generic mapping lookup (~line 240)
 - Modify: `src/Mapping/ExpectationMethodMap.php` — remove `toHaveLength` from MAP
 - Modify: `tests/Rector/Fixture/to_have_length_string.php.inc` — update expected output
@@ -212,6 +217,7 @@ if ($name === 'toHaveLength') {
 **Step 4: Verify `to_have_length.php.inc` also needs updating** — arrays should still work:
 
 Update `to_have_length.php.inc` expected output to:
+
 ```php
 $this->assertSame(3, is_string([1, 2, 3]) ? strlen([1, 2, 3]) : count([1, 2, 3]));
 ```
@@ -229,6 +235,7 @@ $this->assertSame(3, is_string([1, 2, 3]) ? strlen([1, 2, 3]) : count([1, 2, 3])
 **Problem:** `tap(function ($value) { $value->toBe(42); })` inlines the body but `$value` is undefined — it should be bound to the expect subject.
 
 **Files:**
+
 - Modify: `src/Helper/ExpectChainUnwinder.php` — `tap` handling (~line 196)
 - Create: `tests/Rector/Fixture/tap_with_param.php.inc`
 
@@ -237,6 +244,7 @@ $this->assertSame(3, is_string([1, 2, 3]) ? strlen([1, 2, 3]) : count([1, 2, 3])
 ```
 tests/Rector/Fixture/tap_with_param.php.inc
 ```
+
 ```php
 <?php
 test('tap with param', function () {
@@ -307,6 +315,7 @@ if ($name === 'tap') {
 Actually, simpler approach: just assign `$paramName = $currentSubject` once, then inline the body. The existing `expect($value)` inside tap will get processed by `transformBody()` at the test method level.
 
 Simplest fix:
+
 ```php
 if ($name === 'tap') {
     if (count($args) >= 1 && $args[0]->value instanceof \PhpParser\Node\Expr\Closure) {
@@ -342,6 +351,7 @@ Note: The `expect()` calls inside the tap body will be handled by `transformBody
 **Problem:** `beforeAll`/`afterAll` inside describe blocks are silently dropped. They should emit a TODO comment.
 
 **Files:**
+
 - Modify: `src/Rector/PestFileToPhpUnitClassRector.php` — `processDescribe()` (~line 926)
 - Create: `tests/Rector/Fixture/describe_before_all_todo.php.inc`
 
@@ -350,6 +360,7 @@ Note: The `expect()` calls inside the tap body will be handled by `transformBody
 ```
 tests/Rector/Fixture/describe_before_all_todo.php.inc
 ```
+
 ```php
 <?php
 describe('Database', function () {
@@ -421,6 +432,7 @@ Pass these down and prepend to each test's body in the describe scope.
 **Problem:** `not->toBeJson()` maps to `assertIsNotString` which is semantically wrong. Should emit TODO since there's no clean PHPUnit negation.
 
 **Files:**
+
 - Modify: `src/Mapping/ExpectationMethodMap.php` — change `assertJson` negation
 - Modify: `src/Helper/ExpectChainUnwinder.php` — handle missing negation with TODO
 - Create: `tests/Rector/Fixture/not_to_be_json.php.inc`
@@ -430,6 +442,7 @@ Pass these down and prepend to each test's body in the describe scope.
 ```
 tests/Rector/Fixture/not_to_be_json.php.inc
 ```
+
 ```php
 <?php
 test('not json', function () {
@@ -455,6 +468,7 @@ Remove the `'assertJson' => 'assertIsNotString'` line from `ExpectationMethodMap
 In `processGroup()`, when `$negated` is true and `ExpectationMethodMap::getNegated()` returns null, emit a TODO comment instead of using the un-negated method:
 
 The current code at ~line 245-248:
+
 ```php
 if ($negated) {
     $phpunitMethod = ExpectationMethodMap::getNegated($phpunitMethod) ?? $phpunitMethod;
@@ -463,6 +477,7 @@ if ($negated) {
 ```
 
 Change to:
+
 ```php
 if ($negated) {
     $negatedMethod = ExpectationMethodMap::getNegated($phpunitMethod);
@@ -493,6 +508,7 @@ if ($negated) {
 **Problem:** Current regexes `/^[^a-z]*$/` and `/^[^A-Z]*$/` accept empty strings, digits, and punctuation. Pest uses `strtoupper($value) === $value` / `strtolower($value) === $value`.
 
 **Files:**
+
 - Modify: `src/Helper/ExpectChainUnwinder.php` — `toBeUppercase`/`toBeLowercase` handling (~line 440-441)
 - Modify: `tests/Rector/Fixture/to_be_uppercase.php.inc` — update expected regex
 - Modify: `tests/Rector/Fixture/to_be_lowercase.php.inc` — update expected regex
@@ -502,11 +518,13 @@ if ($negated) {
 Replace the regex approach with Pest's actual semantics for these two. Instead of a regex match, emit:
 
 For `toBeUppercase`:
+
 ```php
 $this->assertSame(strtoupper($subject), $subject);
 ```
 
 For `toBeLowercase`:
+
 ```php
 $this->assertSame(strtolower($subject), $subject);
 ```
@@ -523,14 +541,14 @@ This is more accurate than any regex. Extract these two from the regex map and h
 
 ## Summary
 
-| Task | Priority | Effort | Impact |
-|---|:---:|:---:|---|
-| 1. `toThrow()` no args | 🔴 HIGH | S | Prevents false-positive tests |
-| 2. `toThrow('string')` disambiguation | 🟡 MED | S | Correct exception class vs message |
-| 3. `toHaveLength` string support | 🟡 MED | S | Prevents TypeError on strings |
-| 4. `tap()` with parameter | 🟡 MED | M | Prevents undefined variable |
-| 5. Describe `beforeAll`/`afterAll` TODO | 🟢 LOW | S | Prevents silent data loss |
-| 6. `assertJson` negation | 🟢 LOW | S | Fixes incorrect negation |
-| 7. `toBeUppercase`/`toBeLowercase` accuracy | 🟢 LOW | S | More accurate conversion |
+| Task                                        | Priority | Effort | Impact                             |
+| ------------------------------------------- | :------: | :----: | ---------------------------------- |
+| 1. `toThrow()` no args                      | 🔴 HIGH  |   S    | Prevents false-positive tests      |
+| 2. `toThrow('string')` disambiguation       |  🟡 MED  |   S    | Correct exception class vs message |
+| 3. `toHaveLength` string support            |  🟡 MED  |   S    | Prevents TypeError on strings      |
+| 4. `tap()` with parameter                   |  🟡 MED  |   M    | Prevents undefined variable        |
+| 5. Describe `beforeAll`/`afterAll` TODO     |  🟢 LOW  |   S    | Prevents silent data loss          |
+| 6. `assertJson` negation                    |  🟢 LOW  |   S    | Fixes incorrect negation           |
+| 7. `toBeUppercase`/`toBeLowercase` accuracy |  🟢 LOW  |   S    | More accurate conversion           |
 
 Total estimated effort: ~2-3 hours
