@@ -21,6 +21,7 @@ use PhpParser\Node\Expr\ClassConstFetch;
 use PhpParser\Node\Expr\Closure;
 use PhpParser\Node\Expr\FuncCall;
 use PhpParser\Node\Expr\MethodCall;
+use PhpParser\Node\Expr\PropertyFetch;
 use PhpParser\Node\Expr\StaticCall;
 use PhpParser\Node\Expr\Variable;
 use PhpParser\Node\Identifier;
@@ -412,12 +413,21 @@ CODE_SAMPLE,
 
         $methodName = NameHelper::descriptionToMethodName($description, $funcName === 'it' ? 'it' : 'test');
 
-        // Second arg: closure
+        // Second arg: closure or arrow function
         $closureArg = (count($args) >= 2 && $args[1] instanceof Arg) ? $args[1]->value : null;
         $closure = $closureArg instanceof Closure ? $closureArg : null;
+        $arrowFn = $closureArg instanceof ArrowFunction ? $closureArg : null;
 
-        $params = $closure !== null ? $closure->params : [];
-        $body = $closure !== null ? $closure->stmts : [];
+        $params = [];
+        $body = [];
+
+        if ($closure !== null) {
+            $params = $closure->params;
+            $body = $closure->stmts;
+        } elseif ($arrowFn !== null) {
+            $params = $arrowFn->params;
+            $body = [new Expression($arrowFn->expr)];
+        }
 
         // Process chain modifiers
         $methodAttributes = [];
