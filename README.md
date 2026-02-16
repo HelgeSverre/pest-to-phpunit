@@ -3,10 +3,10 @@
 > [!WARNING]
 > This project is experimental. It handles many common Pest patterns, but edge cases may produce incorrect output. Always review the generated code before committing.
 
-[![Latest Version on Packagist](https://img.shields.io/packagist/v/helgesverre/pest-to-phpunit.svg?style=flat-square)](https://packagist.org/packages/helgesverre/pest-to-phpunit)
-[![Total Downloads](https://img.shields.io/packagist/dt/helgesverre/pest-to-phpunit.svg?style=flat-square)](https://packagist.org/packages/helgesverre/pest-to-phpunit)
-[![PHP Version](https://img.shields.io/packagist/php-v/helgesverre/pest-to-phpunit.svg?style=flat-square)](https://packagist.org/packages/helgesverre/pest-to-phpunit)
-[![License](https://img.shields.io/packagist/l/helgesverre/pest-to-phpunit.svg?style=flat-square)](LICENSE)
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/helgesverre/pest-to-phpunit.svg?style=flat-square&v=1771237613)](https://packagist.org/packages/helgesverre/pest-to-phpunit)
+[![Total Downloads](https://img.shields.io/packagist/dt/helgesverre/pest-to-phpunit.svg?style=flat-square&v=1771237613)](https://packagist.org/packages/helgesverre/pest-to-phpunit)
+[![PHP Version](https://img.shields.io/packagist/php-v/helgesverre/pest-to-phpunit.svg?style=flat-square&v=1771237613)](https://packagist.org/packages/helgesverre/pest-to-phpunit)
+[![License](https://img.shields.io/packagist/l/helgesverre/pest-to-phpunit.svg?style=flat-square&v=1771237613)](LICENSE)
 
 A **Rector extension** that automatically converts **Pest** test files into **PHPUnit** test classes.
 
