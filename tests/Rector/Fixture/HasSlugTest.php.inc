@@ -100,6 +100,7 @@ use Larapress\Models\Taxonomy;
 use Larapress\Models\Term;
 class HasSlugTest extends \PHPUnit\Framework\TestCase
 {
+    protected $user;
     protected function setUp(): void
     {
         parent::setUp();

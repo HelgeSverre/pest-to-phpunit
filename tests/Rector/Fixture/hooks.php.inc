@@ -17,6 +17,7 @@ test('user exists', function () {
 
 class HooksTest extends \PHPUnit\Framework\TestCase
 {
+    protected $user;
     protected function setUp(): void
     {
         parent::setUp();

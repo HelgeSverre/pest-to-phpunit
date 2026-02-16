@@ -13,6 +13,7 @@ class SaloonArchTest extends \PHPUnit\Framework\TestCase
 {
     public function test_it_can_test(): void
     {
+        $this->assertTrue(true);
     }
 }
 
