@@ -120,6 +120,7 @@ test('user exists', function () {
 // After
 class HooksTest extends \PHPUnit\Framework\TestCase
 {
+    protected $user;
     protected function setUp(): void
     {
         parent::setUp();
@@ -246,6 +247,7 @@ class DatasetTest extends \PHPUnit\Framework\TestCase
             'foo@bar.com',
         ];
     }
+
     #[\PHPUnit\Framework\Attributes\DataProvider('emails')]
     public function test_validates_email(string $email): void
     {
