@@ -454,13 +454,15 @@ final class ArchAssertionBuilder
         foreach ($typeFilters as $filter) {
             $filterType = \HelgeSverre\PestToPhpUnit\Mapping\ArchMethodMap::getFilterType($filter);
             if ($filterType !== null) {
-                // e.g., ->leaveByType(ObjectDescription::_CLASS)
-                // Use leaveByNameIsNot to exclude non-matching types — simplified approach
-                // Actually for type filters, we filter the layer by checking the type.
-                // The phpunit-architecture-test uses ->leaveByType() but it expects constants.
-                // Simplify: emit leaveByType with the constant string.
-                // In practice this maps to checking ->reflectionClass->isInterface() etc.
-                // For now, just add a comment — the type filter is typically redundant with the assertion itself
+                // ->leaveByType(ObjectType::_CLASS) etc.
+                $expr = new MethodCall(
+                    $expr,
+                    'leaveByType',
+                    [new Arg(new \PhpParser\Node\Expr\ClassConstFetch(
+                        new \PhpParser\Node\Name\FullyQualified('PHPUnit\\Architecture\\Enums\\ObjectType'),
+                        new Identifier($filterType)
+                    ))]
+                );
             }
         }
 
@@ -729,6 +731,9 @@ final class ArchAssertionBuilder
             return new ConstFetch(new Name('true'));
         }
 
+        if ($items[0] === null) {
+            return new ConstFetch(new Name('true'));
+        }
         $expr = new MethodCall($reflection, 'hasMethod', [new Arg($items[0]->value)]);
         for ($i = 1; $i < count($items); $i++) {
             if ($items[$i] === null) {

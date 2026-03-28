@@ -47,7 +47,7 @@ class VegvesenExampleTest extends \PHPUnit\Framework\TestCase
     }
     public function test_all_request_classes_extend_the_saloon_request_class(): void
     {
-        $layer = $this->layer()->leaveByNameStart('HelgeSverre\Vegvesen\Requests');
+        $layer = $this->layer()->leaveByNameStart('HelgeSverre\Vegvesen\Requests')->leaveByType(\PHPUnit\Architecture\Enums\ObjectType::_CLASS);
         foreach ($layer as $object) {
             $this->assertTrue($object->reflectionClass->isSubclassOf('Saloon\Http\Request'), sprintf('Expected %s to extend the given class', $object->name));
         }

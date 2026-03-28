@@ -29,7 +29,6 @@ final class ArchChainConverter
         $expectNamespace = null;
         $expectFunctions = null;
         $negated = false;
-        $each = false;
         $typeFilters = [];
         $ignoringNamespaces = [];
         $terminalMethod = null;
@@ -67,7 +66,8 @@ final class ArchChainConverter
             }
 
             if ($name === 'each') {
-                $each = true;
+                // 'each' in arch context means "for each item in array, run assertion"
+                // This is already handled by function_usage strategy iterating the array
                 continue;
             }
 
@@ -113,6 +113,11 @@ final class ArchChainConverter
         }
 
         [$strategy, $assertionKey, $supportsNegation] = $mapping;
+
+        // If negation is used on an assertion that doesn't support it, bail out
+        if ($negated && !$supportsNegation) {
+            return null;
+        }
 
         // ── 3. Delegate to the builder ───────────────────────────────────
         return match ($strategy) {
