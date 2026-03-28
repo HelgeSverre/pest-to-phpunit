@@ -6,6 +6,7 @@ namespace HelgeSverre\PestToPhpUnit\Rector;
 
 use HelgeSverre\PestToPhpUnit\Helper\CustomExpectationRegistry;
 use HelgeSverre\PestToPhpUnit\Helper\ExpectChainUnwinder;
+use HelgeSverre\PestToPhpUnit\Helper\ArchChainConverter;
 use HelgeSverre\PestToPhpUnit\Helper\NameHelper;
 use HelgeSverre\PestToPhpUnit\Mapping\ExpectationMethodMap;
 use HelgeSverre\PestToPhpUnit\Mapping\HookMap;
@@ -66,6 +67,8 @@ final class PestFileToPhpUnitClassRector extends AbstractRector implements Confi
     private array $processedFiles = [];
 
     private bool $inferNamespace = false;
+
+    private bool $hasArchTests = false;
 
     /**
      * @param mixed[] $configuration
@@ -138,6 +141,7 @@ CODE_SAMPLE,
 
         // Mark file as processed
         $this->processedFiles[$filePath] = true;
+        $this->hasArchTests = false;
 
         // Collect all statements from the file
         $allStmts = $this->file->getNewStmts();
@@ -340,7 +344,7 @@ CODE_SAMPLE,
                     break;
 
                 case 'arch':
-                    $method = $this->processArch($rootCall);
+                    $method = $this->processArch($rootCall, $chainModifiers);
                     if ($method !== null) {
                         $methods[] = $method;
                     }
@@ -363,6 +367,10 @@ CODE_SAMPLE,
 
         // Build class body
         $classStmts = [];
+
+        if ($this->hasArchTests) {
+            $traitUses[] = new FullyQualified('PHPUnit\\Architecture\\ArchitectureAsserts');
+        }
 
         if ($traitUses !== []) {
             $classStmts[] = new TraitUse($traitUses);
@@ -559,7 +567,7 @@ CODE_SAMPLE,
                 }
             }
             if ($hasExpectModifier) {
-                return $this->processArchTestMethod($methodName, $description);
+                return $this->processArchTestMethod($methodName, $description, $chainModifiers);
             }
         }
 
@@ -1061,13 +1069,32 @@ CODE_SAMPLE,
     /**
      * Process arch() call into a skipped test with a comment.
      */
-    private function processArch(FuncCall $call): ?ClassMethod
+    /**
+     * Process arch() call into a PHPUnit test method using ArchitectureAsserts.
+     *
+     * @param list<array{name: string, args: list<Arg>}> $chainModifiers
+     */
+    private function processArch(FuncCall $call, array $chainModifiers): ?ClassMethod
     {
         $descriptionArg = (count($call->args) >= 1 && $call->args[0] instanceof Arg) ? $call->args[0]->value : null;
         $description = $descriptionArg instanceof String_ ? $descriptionArg->value : 'arch test';
-
         $methodName = NameHelper::descriptionToMethodName($description, 'test');
 
+        $stmts = ArchChainConverter::convert($chainModifiers);
+
+        if ($stmts !== null) {
+            $this->hasArchTests = true;
+            return new ClassMethod(
+                $methodName,
+                [
+                    'flags' => Class_::MODIFIER_PUBLIC,
+                    'returnType' => new Identifier('void'),
+                    'stmts' => $stmts,
+                ]
+            );
+        }
+
+        // Fallback: could not convert
         $skipStmt = new Expression(
             new MethodCall(
                 new Variable('this'),
@@ -1088,12 +1115,30 @@ CODE_SAMPLE,
     }
 
     /**
-     * Build a skipped arch test method result for higher-order arch patterns like it('...')->expect(...)->each->not->toBeUsed().
+     * Build an arch test method for higher-order arch patterns like
+     * it('...')->expect(...)->each->not->toBeUsed().
      *
+     * @param list<array{name: string, args: list<Arg>}> $chainModifiers
      * @return array{method: ClassMethod, providerCounter: int}
      */
-    private function processArchTestMethod(string $methodName, string $description): array
+    private function processArchTestMethod(string $methodName, string $description, array $chainModifiers): array
     {
+        $stmts = ArchChainConverter::convert($chainModifiers);
+
+        if ($stmts !== null) {
+            $this->hasArchTests = true;
+            $method = new ClassMethod(
+                $methodName,
+                [
+                    'flags' => Class_::MODIFIER_PUBLIC,
+                    'returnType' => new Identifier('void'),
+                    'stmts' => $stmts,
+                ]
+            );
+            return ['method' => $method, 'providerCounter' => 0];
+        }
+
+        // Fallback
         $skipStmt = new Expression(
             new MethodCall(
                 new Variable('this'),
