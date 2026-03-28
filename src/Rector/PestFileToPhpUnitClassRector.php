@@ -1036,6 +1036,11 @@ CODE_SAMPLE,
                     $results[] = $result;
                     $providerCounter = $result['providerCounter'];
                 }
+            } elseif ($funcName === 'arch') {
+                $method = $this->processArch($rootCall, $chainModifiers);
+                if ($method !== null) {
+                    $results[] = ['method' => $method, 'providerCounter' => $providerCounter];
+                }
             } elseif ($funcName === 'describe') {
                 $nestedModifiers = array_merge($describeModifiers, $chainModifiers);
                 $nestedResults = $this->processDescribe($rootCall, $prefix, $dataProviders, $providerCounter, $nestedModifiers, array_merge($scopedTodos, $mergedBeforeEach), $mergedAfterEach);
