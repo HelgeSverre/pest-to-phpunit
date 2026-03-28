@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.0.9] - 2026-03-28
+
+### New Features
+- **Arch test support via `ta-tikoma/phpunit-architecture-test`** ([#1](https://github.com/HelgeSverre/pest-to-phpunit/issues/1)) — Pest `arch()` tests are now converted into real PHPUnit architecture tests using the `ArchitectureAsserts` trait, instead of emitting `markTestSkipped()`. Supports:
+  - **28 targeted assertions** (reflection-based): `toBeFinal`, `toBeAbstract`, `toBeReadonly`, `toBeClasses`, `toBeInterfaces`, `toBeTraits`, `toBeEnums`, `toBeInvokable`, `toExtend`, `toExtendNothing`, `toImplement`, `toImplementNothing`, `toOnlyImplement`, `toUseTrait`, `toHavePrefix`, `toHaveSuffix`, `toHaveMethod`, `toHaveMethods`, `toHaveConstructor`, `toHaveDestructor`, `toHaveAttribute`, `toBeIntBackedEnum`, `toBeStringBackedEnum`
+  - **Dependency assertions**: `toUse`, `not->toUse`, `toBeUsedIn`, `not->toBeUsedIn` via `assertDependOn`/`assertDoesNotDependOn`
+  - **Function usage**: `expect(['dd','dump'])->not->toBeUsed()` with triple-nested foreach pattern
+  - **File content checks**: `toUseStrictTypes`, `toUseStrictEquality`, `toHaveLineCountLessThan` with file parsing
+  - **Type filters**: `->classes()`, `->interfaces()`, `->traits()`, `->enums()` generate `leaveByType()` calls
+  - **Ignoring**: `->ignoring('Namespace')` generates `excludeByNameStart()` chains
+  - **Negation**: all negatable assertions support `->not->` with correct `assertTrue`/`assertFalse` flipping, double negation cancels out, unsupported negation falls back gracefully
+  - **Higher-order arch**: `test('x')->expect('App')->toBeFinal()` and `it('x')->expect([...])->each->not->toBeUsed()`
+  - **Arch in describe blocks**: `describe('Architecture', function() { arch(...) })` including nested describes
+  - **Trait merge**: `uses(SomeTrait::class)` combined with arch tests produces both traits in one `use` statement
+  - **Graceful fallbacks**: unknown modifiers (`preset()`, `group()`), unsupported negation, missing args, and class constants in `expect()` all fall back to `markTestSkipped` with a clear message
+  - **Complex assertions**: `toOnlyUse`, `toUseNothing`, `toBeUsedInNothing`, `toOnlyBeUsedIn`, `toHavePublicMethods`, `toHaveMethodsDocumented`, `toHavePropertiesDocumented` emit `markTestIncomplete` for manual review
+
+### Architecture
+- New `ArchMethodMap` — maps all 57 Pest arch assertion methods to conversion strategies
+- New `ArchChainConverter` — parses arch chain modifiers into structured state
+- New `ArchAssertionBuilder` — generates PhpParser AST nodes for all assertion types
+- `PestFileToPhpUnitClassRector` — delegates to converter, conditionally adds `ArchitectureAsserts` trait
+
+### Testing
+- **444 tests, 4,558 assertions** (up from 499 / 4,161)
+- 79 arch-specific fixture files covering every assertion type, negation variant, filter, fallback path, higher-order pattern, describe integration, and trait merge scenario
+
 ## [v0.0.8] - 2026-03-28
 
 ### Bug Fixes
