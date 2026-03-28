@@ -13,10 +13,14 @@ test('normal test', function () {
 
 class ArchTest extends \PHPUnit\Framework\TestCase
 {
+    use \PHPUnit\Architecture\ArchitectureAsserts;
     public function test_app_code_is_strict(): void
     {
-        /** Pest arch() test - manual review needed */
-        $this->markTestSkipped('Arch test not supported in PHPUnit: app code is strict');
+        $layer = $this->layer()->leaveByNameStart('App');
+        foreach ($layer as $object) {
+            $contents = file_get_contents($object->path);
+            $this->assertTrue(str_contains($contents, 'declare(strict_types=1)'), 'Expected strict_types in ' . $object->name);
+        }
     }
     public function test_normal_test(): void
     {

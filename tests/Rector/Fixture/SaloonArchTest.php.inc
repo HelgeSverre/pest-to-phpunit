@@ -11,13 +11,21 @@ it('will not use debugging functions')
 
 class SaloonArchTest extends \PHPUnit\Framework\TestCase
 {
+    use \PHPUnit\Architecture\ArchitectureAsserts;
     public function test_it_can_test(): void
     {
         $this->assertTrue(true);
     }
     public function test_it_will_not_use_debugging_functions(): void
     {
-        /** Pest arch() test - manual review needed */
-        $this->markTestSkipped('Arch test not supported in PHPUnit: will not use debugging functions');
+        $layer = $this->layer();
+        $forbiddenFunctions = ['dd', 'dump', 'ray'];
+        foreach ($layer as $object) {
+            foreach ($object->uses as $use) {
+                foreach ($forbiddenFunctions as $function) {
+                    $this->assertNotSame($function, $use, 'Function ' . $function . ' should not be used in ' . $object->name);
+                }
+            }
+        }
     }
 }
