@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace HelgeSverre\PestToPhpUnit\Tests\Rector;
 
+use HelgeSverre\PestToPhpUnit\Helper\CustomExpectationRegistry;
 use Iterator;
 use PhpParser\Error as PhpParserError;
 use PhpParser\ParserFactory;
@@ -12,6 +13,12 @@ use Rector\Testing\PHPUnit\AbstractRectorTestCase;
 
 final class PestFileToPhpUnitClassRectorTest extends AbstractRectorTestCase
 {
+    protected function setUp(): void
+    {
+        parent::setUp();
+        CustomExpectationRegistry::clear();
+    }
+
     #[DataProvider('provideData')]
     public function test(string $filePath): void
     {

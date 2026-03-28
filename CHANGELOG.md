@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.0.8] - 2026-03-28
+
+### Bug Fixes
+- **`->not->toMatchConstraint()` silently dropped negation** — The negation flag was reset without being used, so `expect($x)->not->toMatchConstraint($c)` produced a positive `assertThat` instead of wrapping the constraint in `LogicalNot`
+- **`toHaveMethods` (plural) passed array to `method_exists()`** — `toHaveMethods(['save', 'delete'])` passed the entire array as the second argument to `method_exists()` instead of iterating. Now expands to one `method_exists()` call per method, matching `toHaveKeys` behavior
+- **Unit tests silently not running in CI** — `phpunit.xml` only included `tests/Rector`; the `tests/Unit` directory with 16+ parameterized `ExpectChainUnwinderTest` cases was never executed
+- **`CustomExpectationRegistry` static state leaked across fixtures** — Added `CustomExpectationRegistry::clear()` in integration test `setUp()` to prevent custom expectations registered by one fixture from contaminating subsequent fixtures
+
+### Testing
+- **499 tests, 4,161 assertions** (up from 353 / ~3,700)
+- 4 new unit test classes: `NameHelperTest` (14 cases), `ExpectationMethodMapTest` (10 cases), `CustomExpectationRegistryTest` (10 cases), `CustomExpectationInlinerTest` (6 cases)
+- 20 new fixture tests covering:
+  - Negation gaps: `not_to_match_constraint`, `not_to_have_methods`, `not_to_be_between`, `not_to_match_object`
+  - Feature interactions: `each_not_custom_expectation`, `each_not_to_be_between`, `describe_with_scoped_hooks_and_dataset`, `describe_nested_with_custom_expectations`, `custom_expect_with_and_chain`
+  - Edge cases: `to_have_methods`, `to_have_keys_positive`, `multiple_not_toggles`, `pipe_then_assert`, `to_contain_after_property_access`, `test_empty_description`, `test_unicode_description`, `empty_describe_block`, `multiple_expect_extend_same_name`, `test_numeric_start_description`, `test_special_chars_description`
+
 ## [v0.0.7] - 2026-02-17
 
 ### New Features

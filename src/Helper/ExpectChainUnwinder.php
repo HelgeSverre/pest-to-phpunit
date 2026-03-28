@@ -281,12 +281,21 @@ final class ExpectChainUnwinder
 
             // toMatchConstraint($constraint)
             if ($name === 'toMatchConstraint') {
-                $negated = false;
                 if (count($args) >= 1) {
+                    $constraintArg = $args[0];
+                    if ($negated) {
+                        $constraintArg = new Arg(
+                            new Expr\New_(
+                                new FullyQualified('PHPUnit\\Framework\\Constraint\\LogicalNot'),
+                                [$constraintArg]
+                            )
+                        );
+                    }
                     $stmts[] = new Stmt\Expression(
-                        new MethodCall(new Variable('this'), 'assertThat', [new Arg($currentSubject), $args[0]])
+                        new MethodCall(new Variable('this'), 'assertThat', [new Arg($currentSubject), $constraintArg])
                     );
                 }
+                $negated = false;
                 continue;
             }
 
@@ -450,8 +459,7 @@ final class ExpectChainUnwinder
                 continue;
             }
 
-            if ($name === 'toHaveMethod' || $name === 'toHaveMethods') {
-                // Skip - no direct PHPUnit equivalent, emit assertTrue with method_exists
+            if ($name === 'toHaveMethod') {
                 $phpunitMethod = $negated ? 'assertFalse' : 'assertTrue';
                 $negated = false;
                 if (count($args) >= 1) {
@@ -466,6 +474,29 @@ final class ExpectChainUnwinder
                             [new Arg($methodExistsCall)]
                         )
                     );
+                }
+                continue;
+            }
+
+            if ($name === 'toHaveMethods') {
+                $phpunitMethod = $negated ? 'assertFalse' : 'assertTrue';
+                $negated = false;
+                if (count($args) >= 1 && $args[0]->value instanceof \PhpParser\Node\Expr\Array_) {
+                    foreach ($args[0]->value->items as $item) {
+                        if ($item !== null) {
+                            $methodExistsCall = new FuncCall(
+                                new Name('method_exists'),
+                                [new Arg($currentSubject), new Arg($item->value)]
+                            );
+                            $stmts[] = new Stmt\Expression(
+                                new MethodCall(
+                                    new Variable('this'),
+                                    $phpunitMethod,
+                                    [new Arg($methodExistsCall)]
+                                )
+                            );
+                        }
+                    }
                 }
                 continue;
             }

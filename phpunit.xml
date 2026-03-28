@@ -6,6 +6,7 @@
     <testsuites>
         <testsuite name="default">
             <directory suffix="Test.php">tests/Rector</directory>
+            <directory suffix="Test.php">tests/Unit</directory>
             <exclude>tests/Rector/Fixture</exclude>
         </testsuite>
     </testsuites>
