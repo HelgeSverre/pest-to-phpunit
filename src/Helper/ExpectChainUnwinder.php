@@ -343,6 +343,14 @@ final class ExpectChainUnwinder
             if ($mapping !== null) {
                 [$phpunitMethod, $argOrder] = $mapping;
 
+                if ($argOrder === 'expected_actual' && $args === []) {
+                    $comment = new Nop();
+                    $comment->setAttribute('comments', [new Comment("// TODO(Pest): ->{$name}() requires an expected value")]);
+                    $stmts[] = $comment;
+                    $negated = false;
+                    continue;
+                }
+
                 if ($negated) {
                     if ($name === 'toBeFinite' || $name === 'toBeInfinite') {
                         $function = $name === 'toBeFinite' ? 'is_finite' : 'is_infinite';

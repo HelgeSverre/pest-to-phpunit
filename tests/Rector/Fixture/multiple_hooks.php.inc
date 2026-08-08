@@ -25,10 +25,6 @@ class MultipleHooksTest extends \PHPUnit\Framework\TestCase
     {
         parent::setUp();
         $this->db = new Database();
-    }
-    protected function setUp(): void
-    {
-        parent::setUp();
         $this->db->beginTransaction();
     }
     protected function tearDown(): void

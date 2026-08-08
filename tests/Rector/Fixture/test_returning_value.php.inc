@@ -12,6 +12,7 @@ class TestReturningValueTest extends \PHPUnit\Framework\TestCase
     {
         $user = createUser();
         $this->assertSame('John', $user->name);
-        return $user;
+        // TODO(Pest): test return value was discarded because PHPUnit tests must return void
+        return;
     }
 }

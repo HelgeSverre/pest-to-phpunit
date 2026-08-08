@@ -356,6 +356,9 @@ CODE_SAMPLE,
             }
         }
 
+        $methods = $this->mergeLifecycleHooks($methods);
+        $this->makeMethodNamesUnique($dataProviders, $methods);
+
         // Collect property writes from all method bodies
         $propertyNames = [];
         foreach ($methods as $method) {
@@ -461,6 +464,44 @@ CODE_SAMPLE,
             return $namespace;
         }
         return $class;
+    }
+
+    /** @param list<ClassMethod> $methods @return list<ClassMethod> */
+    private function mergeLifecycleHooks(array $methods): array
+    {
+        $hooks = ['setUp', 'tearDown', 'setUpBeforeClass', 'tearDownAfterClass'];
+        $merged = [];
+        foreach ($methods as $method) {
+            $name = $method->name->toString();
+            if (! in_array($name, $hooks, true) || ! isset($merged[$name])) {
+                $merged[$name] = $method;
+                continue;
+            }
+            $stmts = $method->stmts ?? [];
+            // processHook() prepends parent::<hook>(); it must run once.
+            array_push($merged[$name]->stmts, ...array_slice($stmts, 1));
+        }
+        return array_values($merged);
+    }
+
+    /** @param list<ClassMethod> $providers @param list<ClassMethod> $methods */
+    private function makeMethodNamesUnique(array &$providers, array &$methods): void
+    {
+        $used = [];
+        foreach ([$providers, $methods] as $methodList) {
+            foreach ($methodList as $method) {
+                $base = $method->name->toString();
+                $name = $base;
+                $suffix = 2;
+                while (isset($used[$name])) {
+                    $name = $base . '_' . $suffix++;
+                }
+                $used[$name] = true;
+                if ($name !== $base) {
+                    $method->name = new Identifier($name);
+                }
+            }
+        }
     }
 
     /**
@@ -679,9 +720,9 @@ CODE_SAMPLE,
 
                 case 'after':
                     if (count($modifier['args']) > 0 && $modifier['args'][0]->value instanceof Closure) {
-                        $afterStmts = $modifier['args'][0]->value->stmts;
+                        $afterStmts = $this->transformBody($modifier['args'][0]->value->stmts);
                     } elseif (count($modifier['args']) > 0 && $modifier['args'][0]->value instanceof ArrowFunction) {
-                        $afterStmts = [new Expression($modifier['args'][0]->value->expr)];
+                        $afterStmts = $this->transformBody([new Expression($modifier['args'][0]->value->expr)]);
                     }
                     break;
             }
@@ -726,6 +767,7 @@ CODE_SAMPLE,
             // Transform expect() chains in the body
             $body = $this->transformBody($body);
         }
+        $body = $this->discardTestReturnValues($body);
 
         // Wrap body in for loop if ->repeat(N) was used
         if ($repeatExpr !== null) {
@@ -854,6 +896,15 @@ CODE_SAMPLE,
 
             $value = $arg->value;
 
+            if ($value instanceof Array_) {
+                foreach ($value->items as $item) {
+                    if ($item !== null) {
+                        $this->processUses(new FuncCall(new Name('uses'), [new Arg($item->value)]), $extendsClass, $traitUses);
+                    }
+                }
+                continue;
+            }
+
             // Handle Class::class references
             if ($value instanceof ClassConstFetch && $value->name instanceof Identifier && $value->name->name === 'class') {
                 $className = $value->class instanceof Name ? $value->class->toString() : null;
@@ -861,15 +912,14 @@ CODE_SAMPLE,
                     continue;
                 }
 
-                // If the name contains "TestCase", use it as the extends class
-                if (str_contains($className, 'TestCase')) {
+                if ((class_exists($className) && ! trait_exists($className)) || str_contains($className, 'TestCase')) {
                     $extendsClass = new FullyQualified($className);
                 } else {
                     $traitUses[] = new Name($className);
                 }
             } elseif ($value instanceof String_) {
                 $className = $value->value;
-                if (str_contains($className, 'TestCase')) {
+                if ((class_exists($className) && ! trait_exists($className)) || str_contains($className, 'TestCase')) {
                     $extendsClass = new FullyQualified($className);
                 } else {
                     $traitUses[] = new Name($className);
@@ -975,14 +1025,14 @@ CODE_SAMPLE,
             if ($fn === 'beforeEach') {
                 $closureHookArg = (count($root->args) >= 1 && $root->args[0] instanceof Arg) ? $root->args[0]->value : null;
                 if ($closureHookArg instanceof Closure) {
-                    $localBeforeEach = array_merge($localBeforeEach, $closureHookArg->stmts);
+                    $localBeforeEach = array_merge($localBeforeEach, $this->transformBody($closureHookArg->stmts));
                 } elseif ($closureHookArg instanceof ArrowFunction) {
                     $localBeforeEach[] = new Expression($closureHookArg->expr);
                 }
             } elseif ($fn === 'afterEach') {
                 $closureHookArg = (count($root->args) >= 1 && $root->args[0] instanceof Arg) ? $root->args[0]->value : null;
                 if ($closureHookArg instanceof Closure) {
-                    $localAfterEach = array_merge($localAfterEach, $closureHookArg->stmts);
+                    $localAfterEach = array_merge($localAfterEach, $this->transformBody($closureHookArg->stmts));
                 } elseif ($closureHookArg instanceof ArrowFunction) {
                     $localAfterEach[] = new Expression($closureHookArg->expr);
                 }
@@ -1322,6 +1372,10 @@ CODE_SAMPLE,
                 }
             }
 
+            if ($stmt instanceof Expression && $stmt->expr instanceof Assign && $stmt->expr->expr instanceof Closure) {
+                $stmt->expr->expr->stmts = $this->transformBody($stmt->expr->expr->stmts);
+            }
+
             // Recurse into child statement blocks (if, for, foreach, etc.)
             $this->transformChildBlocks($stmt);
 
@@ -1332,6 +1386,21 @@ CODE_SAMPLE,
         $result = array_map(fn (Stmt $s) => $this->transformFakeCallsInStmt($s), $result);
 
         return $result;
+    }
+
+    /** @param list<Stmt> $stmts @return list<Stmt> */
+    private function discardTestReturnValues(array $stmts): array
+    {
+        foreach ($stmts as $index => $stmt) {
+            if ($stmt instanceof Return_ && $stmt->expr !== null) {
+                $todo = new Nop();
+                $todo->setAttribute('comments', [new Comment('// TODO(Pest): test return value was discarded because PHPUnit tests must return void')]);
+                $stmts[$index] = $todo;
+                array_splice($stmts, $index + 1, 0, [new Return_()]);
+                break;
+            }
+        }
+        return $stmts;
     }
 
     /**

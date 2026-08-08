@@ -100,6 +100,10 @@ final class NameHelper
         $name = ucwords($name);
         $name = str_replace(' ', '', $name);
 
+        if ($name === '' || ctype_digit($name[0])) {
+            $name = 'Generated' . $name;
+        }
+
         // Ensure it ends with Test
         if (! str_ends_with($name, 'Test')) {
             $name .= 'Test';
