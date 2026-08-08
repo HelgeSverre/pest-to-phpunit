@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.0.10] - 2026-08-08
+
+### Bug Fixes
+- Preserve `toContain()` behavior for runtime string and iterable subjects.
+- Correct negated range and finite/infinite expectation conversions.
+- Convert returned expectations and prevent invalid value returns in generated `void` tests.
+- Merge duplicate PHPUnit lifecycle hooks and make generated method names unique.
+- Generate valid class names for digit-prefixed filenames and unpack array-form `uses()` calls.
+
+### Testing
+- **574 tests, 4,932 assertions** — full suite passing.
+
 ## [v0.0.9] - 2026-03-28
 
 ### New Features
