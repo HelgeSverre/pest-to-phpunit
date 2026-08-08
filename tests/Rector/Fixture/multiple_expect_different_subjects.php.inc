@@ -14,7 +14,11 @@ class MultipleExpectDifferentSubjectsTest extends \PHPUnit\Framework\TestCase
     public function test_multiple_expects(): void
     {
         $this->assertSame('John', $user->name);
-        $this->assertContains('@', $user->email);
+        if (is_string($__pest_contain_subject = $user->email)) {
+            $this->assertStringContainsString('@', $__pest_contain_subject);
+        } else {
+            $this->assertContains('@', $__pest_contain_subject);
+        }
         $this->assertGreaterThan(18, $user->age);
         $this->assertTrue($user->active);
         $this->assertIsArray($user->roles);

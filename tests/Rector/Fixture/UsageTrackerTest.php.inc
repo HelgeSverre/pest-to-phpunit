@@ -32,7 +32,6 @@ test('tracker clears all records', function () {
     expect($this->tracker->getAll())->toBeEmpty()
         ->and($this->tracker->getTotalCost())->toBe(0.0);
 });
-
 -----
 <?php
 
@@ -52,13 +51,21 @@ class UsageTrackerTest extends \PHPUnit\Framework\TestCase
     public function test_tracker_listens_to_events(): void
     {
         $events = $this->tracker->listensTo();
-        $this->assertContains('after_llm_response', $events);
+        if (is_string($__pest_contain_subject = $events)) {
+            $this->assertStringContainsString('after_llm_response', $__pest_contain_subject);
+        } else {
+            $this->assertContains('after_llm_response', $__pest_contain_subject);
+        }
     }
     public function test_tracker_does_not_listen_when_disabled(): void
     {
         $tracker = new UsageTracker(['track_llm' => false]);
         $events = $tracker->listensTo();
-        $this->assertNotContains('after_llm_response', $events);
+        if (is_string($__pest_contain_subject = $events)) {
+            $this->assertStringNotContainsString('after_llm_response', $__pest_contain_subject);
+        } else {
+            $this->assertNotContains('after_llm_response', $__pest_contain_subject);
+        }
     }
     public function test_tracker_records_and_chains_assertions(): void
     {

@@ -250,32 +250,31 @@ final class ExpectChainUnwinder
                 continue;
             }
 
-            // toContain: use assertStringContainsString for string literal subjects, assertContains otherwise
+            // toContain() supports both strings and iterables. For non-literal subjects,
+            // preserve that behaviour with a runtime type check.
             if ($name === 'toContain') {
                 $isStringSubject = $currentSubject instanceof String_;
 
                 if ($eachMode) {
-                    // In each mode we iterate over items — can't know their type, use assertContains
-                    $baseMethod = 'assertContains';
-                    $negMethod = 'assertNotContains';
+                    $itemVar = new Variable(self::EACH_ITEM_VAR);
+                    foreach ($args as $singleArg) {
+                        $stmts[] = new Stmt\Foreach_(
+                            $currentSubject,
+                            $itemVar,
+                            ['stmts' => [self::buildContainAssertion($itemVar, $singleArg, $negated, false)]]
+                        );
+                    }
                 } elseif ($isStringSubject) {
-                    $baseMethod = 'assertStringContainsString';
-                    $negMethod = 'assertStringNotContainsString';
-                } else {
-                    $baseMethod = 'assertContains';
-                    $negMethod = 'assertNotContains';
-                }
-
-                $phpunitMethod = $negated ? $negMethod : $baseMethod;
-                $negated = false;
-
-                foreach ($args as $singleArg) {
-                    if ($eachMode) {
-                        $stmts[] = self::buildEachAssertion($currentSubject, $phpunitMethod, 'expected_actual', [$singleArg]);
-                    } else {
+                    $phpunitMethod = $negated ? 'assertStringNotContainsString' : 'assertStringContainsString';
+                    foreach ($args as $singleArg) {
                         $stmts[] = self::buildAssertion($currentSubject, $phpunitMethod, 'expected_actual', [$singleArg]);
                     }
+                } else {
+                    foreach ($args as $singleArg) {
+                        $stmts[] = self::buildContainAssertion($currentSubject, $singleArg, $negated, true);
+                    }
                 }
+                $negated = false;
                 continue;
             }
 
@@ -345,6 +344,26 @@ final class ExpectChainUnwinder
                 [$phpunitMethod, $argOrder] = $mapping;
 
                 if ($negated) {
+                    if ($name === 'toBeFinite' || $name === 'toBeInfinite') {
+                        $function = $name === 'toBeFinite' ? 'is_finite' : 'is_infinite';
+                        $subject = $eachMode ? new Variable(self::EACH_ITEM_VAR) : $currentSubject;
+                        $assertion = new Stmt\Expression(
+                            new MethodCall(new Variable('this'), 'assertFalse', [
+                                new Arg(new FuncCall(new Name($function), [new Arg($subject)])),
+                            ])
+                        );
+                        if ($eachMode) {
+                            $stmts[] = new Stmt\Foreach_(
+                                $currentSubject,
+                                new Variable(self::EACH_ITEM_VAR),
+                                ['stmts' => [$assertion]]
+                            );
+                        } else {
+                            $stmts[] = $assertion;
+                        }
+                        $negated = false;
+                        continue;
+                    }
                     $negatedMethod = ExpectationMethodMap::getNegated($phpunitMethod);
                     if ($negatedMethod !== null) {
                         $phpunitMethod = $negatedMethod;
@@ -450,11 +469,31 @@ final class ExpectChainUnwinder
             if ($name === 'toBeBetween') {
                 // expect($x)->toBeBetween(1, 10)
                 if (count($args) >= 2) {
-                    $gte = $negated ? 'assertLessThan' : 'assertGreaterThanOrEqual';
-                    $lte = $negated ? 'assertGreaterThan' : 'assertLessThanOrEqual';
+                    $subject = $eachMode ? new Variable(self::EACH_ITEM_VAR) : $currentSubject;
+                    $rangeStmts = [];
+                    if ($negated) {
+                        $rangeStmts[] = new Stmt\Expression(
+                            new MethodCall(new Variable('this'), 'assertTrue', [
+                                new Arg(new Expr\BinaryOp\BooleanOr(
+                                    new Expr\BinaryOp\Smaller($subject, $args[0]->value),
+                                    new Expr\BinaryOp\Greater($subject, $args[1]->value),
+                                )),
+                            ])
+                        );
+                    } else {
+                        $rangeStmts[] = self::buildAssertion($subject, 'assertGreaterThanOrEqual', 'expected_actual', [$args[0]]);
+                        $rangeStmts[] = self::buildAssertion($subject, 'assertLessThanOrEqual', 'expected_actual', [$args[1]]);
+                    }
                     $negated = false;
-                    $stmts[] = self::buildAssertion($currentSubject, $gte, 'expected_actual', [$args[0]]);
-                    $stmts[] = self::buildAssertion($currentSubject, $lte, 'expected_actual', [$args[1]]);
+                    if ($eachMode) {
+                        $stmts[] = new Stmt\Foreach_(
+                            $currentSubject,
+                            new Variable(self::EACH_ITEM_VAR),
+                            ['stmts' => $rangeStmts]
+                        );
+                    } else {
+                        array_push($stmts, ...$rangeStmts);
+                    }
                 }
                 continue;
             }
@@ -696,6 +735,29 @@ final class ExpectChainUnwinder
                 $assertArgs
             )
         );
+    }
+
+    private static function buildContainAssertion(Expr $subject, Arg $expected, bool $negated, bool $cacheSubject): Stmt
+    {
+        $actual = $subject;
+
+        if ($cacheSubject) {
+            $actual = new Variable('__pest_contain_subject');
+        }
+
+        $stringMethod = $negated ? 'assertStringNotContainsString' : 'assertStringContainsString';
+        $iterableMethod = $negated ? 'assertNotContains' : 'assertContains';
+        $if = new Stmt\If_(
+            new FuncCall(new Name('is_string'), [new Arg(
+                $cacheSubject ? new Expr\Assign($actual, $subject) : $actual
+            )]),
+            [
+                'stmts' => [self::buildAssertion($actual, $stringMethod, 'expected_actual', [$expected])],
+                'else' => new Stmt\Else_([self::buildAssertion($actual, $iterableMethod, 'expected_actual', [$expected])]),
+            ]
+        );
+
+        return $if;
     }
 
     /**

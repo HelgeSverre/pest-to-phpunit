@@ -1313,6 +1313,15 @@ CODE_SAMPLE,
                 }
             }
 
+            if ($stmt instanceof Return_ && $stmt->expr !== null) {
+                $unwound = ExpectChainUnwinder::unwind($stmt->expr);
+                if ($unwound !== null) {
+                    array_push($result, ...$unwound);
+                    $result[] = new Return_();
+                    continue;
+                }
+            }
+
             // Recurse into child statement blocks (if, for, foreach, etc.)
             $this->transformChildBlocks($stmt);
 

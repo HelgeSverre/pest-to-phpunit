@@ -22,6 +22,10 @@ class WithNamedDatasetSpecialCharsTest extends \PHPUnit\Framework\TestCase
     #[\PHPUnit\Framework\Attributes\DataProvider('user_emails_valid')]
     public function test_validates_email(string $email): void
     {
-        $this->assertContains('@', $email);
+        if (is_string($__pest_contain_subject = $email)) {
+            $this->assertStringContainsString('@', $__pest_contain_subject);
+        } else {
+            $this->assertContains('@', $__pest_contain_subject);
+        }
     }
 }

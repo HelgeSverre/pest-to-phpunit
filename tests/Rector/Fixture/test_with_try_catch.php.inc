@@ -7,7 +7,6 @@ test('handles exceptions', function () {
         expect($e->getMessage())->toContain('error');
     }
 });
-
 -----
 <?php
 class TestWithTryCatchTest extends \PHPUnit\Framework\TestCase
@@ -18,7 +17,11 @@ class TestWithTryCatchTest extends \PHPUnit\Framework\TestCase
             riskyOperation();
             $this->assertTrue(true);
         } catch (Exception $e) {
-            $this->assertContains('error', $e->getMessage());
+            if (is_string($__pest_contain_subject = $e->getMessage())) {
+                $this->assertStringContainsString('error', $__pest_contain_subject);
+            } else {
+                $this->assertContains('error', $__pest_contain_subject);
+            }
         }
     }
 }

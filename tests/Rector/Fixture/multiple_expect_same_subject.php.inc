@@ -6,7 +6,6 @@ test('same subject different assertions', function () {
     expect($arr)->toContain('value');
     expect($arr)->not->toBeEmpty();
 });
-
 -----
 <?php
 class MultipleExpectSameSubjectTest extends \PHPUnit\Framework\TestCase
@@ -16,7 +15,11 @@ class MultipleExpectSameSubjectTest extends \PHPUnit\Framework\TestCase
         $this->assertIsArray($arr);
         $this->assertCount(3, $arr);
         $this->assertArrayHasKey('id', $arr);
-        $this->assertContains('value', $arr);
+        if (is_string($__pest_contain_subject = $arr)) {
+            $this->assertStringContainsString('value', $__pest_contain_subject);
+        } else {
+            $this->assertContains('value', $__pest_contain_subject);
+        }
         $this->assertNotEmpty($arr);
     }
 }

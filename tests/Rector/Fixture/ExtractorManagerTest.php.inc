@@ -116,7 +116,6 @@ describe('ExtractorManager', function () {
         });
     });
 });
-
 -----
 <?php
 
@@ -196,7 +195,11 @@ class ExtractorManagerTest extends \PHPUnit\Framework\TestCase
         $manager = app(ExtractorManager::class);
         $reflection = new ReflectionMethod($manager, 'extract');
         $params = $reflection->getParameters();
-        $this->assertContains('Extractor', $params[0]->getType()->__toString());
+        if (is_string($__pest_contain_subject = $params[0]->getType()->__toString())) {
+            $this->assertStringContainsString('Extractor', $__pest_contain_subject);
+        } else {
+            $this->assertContains('Extractor', $__pest_contain_subject);
+        }
     }
     public function test_it_extractormanager_extract_method_has_default_model_parameter(): void
     {

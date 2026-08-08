@@ -12,6 +12,10 @@ class AndChainMixedAssertionsTest extends \PHPUnit\Framework\TestCase
     {
         $this->assertCount(3, $arr);
         $this->assertArrayHasKey('id', $arr);
-        $this->assertContains('value', $arr);
+        if (is_string($__pest_contain_subject = $arr)) {
+            $this->assertStringContainsString('value', $__pest_contain_subject);
+        } else {
+            $this->assertContains('value', $__pest_contain_subject);
+        }
     }
 }

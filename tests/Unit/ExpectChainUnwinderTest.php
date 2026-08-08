@@ -131,6 +131,12 @@ final class ExpectChainUnwinderTest extends TestCase
         $result = self::unwindAndPrint($expr);
         $this->assertNotNull($result, "not->{$pestMethod}() returned null");
 
+        if ($pestMethod === 'toBeFinite' || $pestMethod === 'toBeInfinite') {
+            $function = $pestMethod === 'toBeFinite' ? 'is_finite' : 'is_infinite';
+            $this->assertStringContainsString("assertFalse({$function}", $result, "not->{$pestMethod}() should negate {$function}()");
+            return;
+        }
+
         $negated = \HelgeSverre\PestToPhpUnit\Mapping\ExpectationMethodMap::getNegated($phpunitMethod);
         if ($negated !== null) {
             $this->assertStringContainsString($negated, $result, "not->{$pestMethod}() should use {$negated}");
@@ -288,7 +294,7 @@ final class ExpectChainUnwinderTest extends TestCase
             'toMatchArray plain' => ['toMatchArray', [new Variable('e')], false, false, 'assertEquals', 'Not'],
             'toMatchArray negated' => ['toMatchArray', [new Variable('e')], true, false, 'assertNotEquals', ''],
             'toBeBetween plain' => ['toBeBetween', [new Int_(1), new Int_(10)], false, false, 'assertGreaterThanOrEqual', ''],
-            'toBeBetween negated' => ['toBeBetween', [new Int_(1), new Int_(10)], true, false, 'assertLessThan', ''],
+            'toBeBetween negated' => ['toBeBetween', [new Int_(1), new Int_(10)], true, false, 'assertTrue($subject < 1 || $subject > 10)', ''],
             'toHaveProperty plain' => ['toHaveProperty', [new String_('name')], false, false, 'assertObjectHasProperty', ''],
             'toHaveProperty negated' => ['toHaveProperty', [new String_('name')], true, false, 'assertObjectNotHasProperty', ''],
         ];

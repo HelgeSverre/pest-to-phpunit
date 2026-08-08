@@ -13,7 +13,6 @@ describe('User', function () {
         expect($this->user->email)->toContain('@');
     });
 });
-
 -----
 <?php
 
@@ -28,6 +27,10 @@ class DescribeScopedBeforeEachTest extends \PHPUnit\Framework\TestCase
     public function test_user_has_email(): void
     {
         $this->user = createUser();
-        $this->assertContains('@', $this->user->email);
+        if (is_string($__pest_contain_subject = $this->user->email)) {
+            $this->assertStringContainsString('@', $__pest_contain_subject);
+        } else {
+            $this->assertContains('@', $__pest_contain_subject);
+        }
     }
 }

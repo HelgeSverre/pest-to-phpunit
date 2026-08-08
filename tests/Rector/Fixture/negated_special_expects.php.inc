@@ -5,7 +5,6 @@ test('negated specials', function () {
     expect($num)->not->toBeBetween(1, 10);
     expect($obj)->not->toHaveMethod('getName');
 });
-
 -----
 <?php
 class NegatedSpecialExpectsTest extends \PHPUnit\Framework\TestCase
@@ -14,8 +13,7 @@ class NegatedSpecialExpectsTest extends \PHPUnit\Framework\TestCase
     {
         $this->assertNotEquals(['key' => 'value'], $arr);
         $this->assertObjectNotHasProperty('name', $obj);
-        $this->assertLessThan(1, $num);
-        $this->assertGreaterThan(10, $num);
+        $this->assertTrue($num < 1 || $num > 10);
         $this->assertFalse(method_exists($obj, 'getName'));
     }
 }

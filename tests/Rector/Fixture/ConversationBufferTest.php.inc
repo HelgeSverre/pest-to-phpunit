@@ -102,7 +102,6 @@ test('conversation buffer recent context fallback works', function () {
     $lastMessage = $recentContext[4]['content'] ?? '';
     expect($lastMessage)->toBe('Message 9');
 });
-
 -----
 <?php
 
@@ -168,8 +167,16 @@ class ConversationBufferTest extends \PHPUnit\Framework\TestCase
         $context = $buffer->getOptimalContext('Show me PHP array iteration methods', 2000);
         // Should have selected PHP-related messages
         $contextText = implode(' ', array_column($context, 'content'));
-        $this->assertContains('PHP', $contextText);
-        $this->assertContains('array', $contextText);
+        if (is_string($__pest_contain_subject = $contextText)) {
+            $this->assertStringContainsString('PHP', $__pest_contain_subject);
+        } else {
+            $this->assertContains('PHP', $__pest_contain_subject);
+        }
+        if (is_string($__pest_contain_subject = $contextText)) {
+            $this->assertStringContainsString('array', $__pest_contain_subject);
+        } else {
+            $this->assertContains('array', $__pest_contain_subject);
+        }
     }
     public function test_conversation_buffer_handles_empty_context_gracefully(): void
     {

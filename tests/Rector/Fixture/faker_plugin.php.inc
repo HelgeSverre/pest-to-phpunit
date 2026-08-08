@@ -30,7 +30,6 @@ test('fake used inline in expect', function () {
 test('fake with locale in expect', function () {
     expect(fake('en_US')->name)->toBeString();
 });
-
 -----
 <?php
 
@@ -49,7 +48,11 @@ class FakerPluginTest extends \PHPUnit\Framework\TestCase
     public function test_fake_used_in_assertion(): void
     {
         $email = \Faker\Factory::create()->safeEmail();
-        $this->assertContains('@', $email);
+        if (is_string($__pest_contain_subject = $email)) {
+            $this->assertStringContainsString('@', $__pest_contain_subject);
+        } else {
+            $this->assertContains('@', $__pest_contain_subject);
+        }
     }
     public function test_fake_assigned_to_variable_and_used(): void
     {

@@ -19,6 +19,10 @@ class TestWithFluentBuilderTest extends \PHPUnit\Framework\TestCase
             ->where('age', '>', 18)
             ->orderBy('name')
             ->limit(10);
-        $this->assertContains('where', $query->toSql());
+        if (is_string($__pest_contain_subject = $query->toSql())) {
+            $this->assertStringContainsString('where', $__pest_contain_subject);
+        } else {
+            $this->assertContains('where', $__pest_contain_subject);
+        }
     }
 }

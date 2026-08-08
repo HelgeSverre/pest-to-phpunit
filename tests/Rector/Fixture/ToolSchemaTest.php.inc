@@ -89,7 +89,6 @@ test('write file tool executes correctly', function () {
     // Clean up
     unlink($testFile);
 });
-
 -----
 <?php
 
@@ -153,7 +152,11 @@ class ToolSchemaTest extends \PHPUnit\Framework\TestCase
         $tool = new HelgeSverre\Swarm\Tools\ReadFile;
         $result = $tool->execute(['path' => '/tmp/non_existent_file.txt']);
         $this->assertFalse($result->isSuccess());
-        $this->assertContains('File not found', $result->getError());
+        if (is_string($__pest_contain_subject = $result->getError())) {
+            $this->assertStringContainsString('File not found', $__pest_contain_subject);
+        } else {
+            $this->assertContains('File not found', $__pest_contain_subject);
+        }
     }
     public function test_write_file_tool_executes_correctly(): void
     {

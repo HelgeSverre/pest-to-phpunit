@@ -17,7 +17,6 @@ test('various assertions', function () {
     expect($num)->toBeLessThan(10);
     expect($arr)->toHaveKey('name');
 });
-
 -----
 <?php
 
@@ -32,7 +31,11 @@ class ExpectChainsTest extends \PHPUnit\Framework\TestCase
         $this->assertIsString($name);
         $this->assertIsInt($count);
         $this->assertInstanceOf(Foo::class, $item);
-        $this->assertContains('hello', $text);
+        if (is_string($__pest_contain_subject = $text)) {
+            $this->assertStringContainsString('hello', $__pest_contain_subject);
+        } else {
+            $this->assertContains('hello', $__pest_contain_subject);
+        }
         $this->assertCount(3, $list);
         $this->assertStringStartsWith('Hello', $text);
         $this->assertStringEndsWith('world', $text);
