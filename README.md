@@ -34,6 +34,10 @@ and a converted Laravel response assertion:
 | 12 | 3 or 4 | 11 or 12 |
 | 13 | 4 or 5 | 12 or 13 |
 
+Laravel 10–11 jobs test legacy compatibility and permit their advisory-affected
+framework releases in those isolated CI installs. This is not a recommendation
+to deploy those versions.
+
 Older Pest core syntax can be converted, but PHPUnit 9 output is not supported.
 Version compatibility covers the documented constructs, not every plugin feature.
 `pest()->extend(...)->use(...)` configuration and imported `Pest\Laravel` helper

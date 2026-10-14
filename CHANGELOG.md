@@ -23,6 +23,7 @@ All notable changes to this project will be documented in this file.
 - Execute converted fixtures in PHPUnit to verify provider rows and generated assertions.
 - Add dependency-resolution jobs for PHP 8.1–8.5 / PHPUnit 10–13 and seven Laravel 10–13 / Pest 2–5 combinations.
 - Add PHPStan level 5 analysis to CI and update the checkout action.
+- Allow advisory-affected Laravel 10–11 versions only in isolated legacy compatibility jobs, while retaining audit reporting.
 - Correct the README dataset example and assertion documentation.
 
 ## [v0.0.10] - 2026-08-08

@@ -54,6 +54,12 @@ jobs:
           php-version: ${{ matrix.php }}
           coverage: none
       - run: composer config allow-plugins.pestphp/pest-plugin true
+      - name: Allow legacy Laravel versions in compatibility tests
+        if: matrix.laravel == '^10.0' || matrix.laravel == '^11.0'
+        # These isolated test jobs exercise old frameworks; keep advisories visible in audits.
+        run: >-
+          composer config --json policy.advisories.ignore
+          '{"laravel/framework":{"constraint":"^10.0 || ^11.0","on-audit":false,"reason":"Legacy compatibility tests only; not an application deployment."}}'
       - name: Install Laravel and Pest compatibility dependencies
         run: composer require --dev --no-interaction --prefer-dist --with-all-dependencies 'laravel/framework:${{ matrix.laravel }}' 'pestphp/pest:${{ matrix.pest }}' 'pestphp/pest-plugin-laravel:${{ matrix.plugin }}'
       - run: vendor/bin/phpunit
