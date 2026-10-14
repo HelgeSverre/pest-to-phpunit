@@ -51,8 +51,8 @@ final class ExpectationMethodMap
         'toBeReadableDirectory' => ['assertDirectoryIsReadable', 'actual_only'],
         'toBeWritableDirectory' => ['assertDirectoryIsWritable', 'actual_only'],
         'toBeNan' => ['assertNan', 'actual_only'],
-        'toBeFinite' => ['assertIsFinite', 'actual_only'],
-        'toBeInfinite' => ['assertIsInfinite', 'actual_only'],
+        'toBeFinite' => ['assertFinite', 'actual_only'],
+        'toBeInfinite' => ['assertInfinite', 'actual_only'],
         'toBeJson' => ['assertJson', 'actual_only'],
         'toBeList' => ['assertIsList', 'actual_only'],
         'toHaveSameSize' => ['assertSameSize', 'expected_actual'],
@@ -104,8 +104,8 @@ final class ExpectationMethodMap
         'assertFileIsWritable' => 'assertFileIsNotWritable',
         'assertDirectoryIsReadable' => 'assertDirectoryIsNotReadable',
         'assertDirectoryIsWritable' => 'assertDirectoryIsNotWritable',
-        'assertIsFinite' => 'assertInfinite',
-        'assertIsInfinite' => 'assertFinite',
+        'assertFinite' => 'assertInfinite',
+        'assertInfinite' => 'assertFinite',
     ];
 
     /**

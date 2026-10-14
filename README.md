@@ -18,6 +18,30 @@ Handles `test()` / `it()` blocks, hooks, datasets, `expect()` assertion chains, 
 composer require --dev helgesverre/pest-to-phpunit
 ```
 
+## Compatibility
+
+Requires PHP 8.1+ and Rector 2.x. Generated tests target PHPUnit 10.5–13;
+CI resolves each PHPUnit major separately on PHP 8.1–8.5.
+
+The converter reads Pest syntax without requiring Pest or Laravel. CI also
+installs these Laravel/Pest/plugin combinations and runs the conversion suite
+and a converted Laravel response assertion:
+
+| Laravel | Pest / Laravel plugin | PHPUnit |
+| --- | --- | --- |
+| 10 | 2 | 10 |
+| 11 | 2 or 3 | 10 or 11 |
+| 12 | 3 or 4 | 11 or 12 |
+| 13 | 4 or 5 | 12 or 13 |
+
+Older Pest core syntax can be converted, but PHPUnit 9 output is not supported.
+Version compatibility covers the documented constructs, not every plugin feature.
+`pest()->extend(...)->use(...)` configuration and imported `Pest\Laravel` helper
+functions (including aliases) are converted. Shared `tests/Pest.php` configuration
+is not automatically propagated to other files; keep the base test case and traits
+in each file being converted, or review and apply the shared configuration manually.
+Browser tests and other unsupported plugin APIs require manual conversion.
+
 ## Usage
 
 ### 1. Add the set to your `rector.php`
@@ -305,15 +329,18 @@ class DatasetTest extends \PHPUnit\Framework\TestCase
     public static function emails(): array
     {
         return [
-            'test@example.com',
-            'foo@bar.com',
+            ['test@example.com'],
+            ['foo@bar.com'],
         ];
     }
-
     #[\PHPUnit\Framework\Attributes\DataProvider('emails')]
     public function test_validates_email(string $email): void
     {
-        $this->assertContains('@', $email);
+        if (is_string($__pest_contain_subject = $email)) {
+            $this->assertStringContainsString('@', $__pest_contain_subject);
+        } else {
+            $this->assertContains('@', $__pest_contain_subject);
+        }
     }
 }
 ```
@@ -377,7 +404,7 @@ class DatasetTest extends \PHPUnit\Framework\TestCase
 | `toBeNull`                                |   ✅   | `assertNull`                                        |
 | `toBeEmpty`                               |   ✅   | `assertEmpty`                                       |
 | `toBeJson`                                |   ✅   | `assertJson`                                        |
-| `toBeNan` / `toBeFinite` / `toBeInfinite` |   ✅   | `assertNan` / `assertIsFinite` / `assertIsInfinite` |
+| `toBeNan` / `toBeFinite` / `toBeInfinite` |   ✅   | `assertNan` / `assertFinite` / `assertInfinite` |
 
 #### Comparison Assertions
 

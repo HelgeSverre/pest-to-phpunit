@@ -45,7 +45,7 @@ final class ArchChainConverter
                         // expect(['dd', 'dump']) → function list mode
                         $functions = [];
                         foreach ($value->items as $item) {
-                            if ($item !== null && $item->value instanceof String_) {
+                            if ($item->value instanceof String_) {
                                 $functions[] = $item->value->value;
                             }
                         }
@@ -77,7 +77,7 @@ final class ArchChainConverter
                         $ignoringNamespaces[] = $arg->value->value;
                     } elseif ($arg->value instanceof Array_) {
                         foreach ($arg->value->items as $item) {
-                            if ($item !== null && $item->value instanceof String_) {
+                            if ($item->value instanceof String_) {
                                 $ignoringNamespaces[] = $item->value->value;
                             }
                         }

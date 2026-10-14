@@ -731,14 +731,8 @@ final class ArchAssertionBuilder
             return new ConstFetch(new Name('true'));
         }
 
-        if ($items[0] === null) {
-            return new ConstFetch(new Name('true'));
-        }
         $expr = new MethodCall($reflection, 'hasMethod', [new Arg($items[0]->value)]);
         for ($i = 1; $i < count($items); $i++) {
-            if ($items[$i] === null) {
-                continue;
-            }
             $expr = new BooleanAnd(
                 $expr,
                 new MethodCall($reflection, 'hasMethod', [new Arg($items[$i]->value)])

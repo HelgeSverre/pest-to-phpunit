@@ -9,24 +9,51 @@ on:
 jobs:
   tests:
     runs-on: ubuntu-latest
-
     strategy:
+      fail-fast: false
       matrix:
-        php: ['8.1', '8.2', '8.3', '8.4', '8.5']
-
-    name: PHP ${{ matrix.php }}
-
+        include:
+          - {php: '8.1', phpunit: '^10.5'}
+          - {php: '8.2', phpunit: '^11.0'}
+          - {php: '8.3', phpunit: '^12.0'}
+          - {php: '8.4', phpunit: '^13.0'}
+          - {php: '8.5', phpunit: '^13.0'}
+    name: PHP ${{ matrix.php }} / PHPUnit ${{ matrix.phpunit }}
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup PHP
-        uses: shivammathur/setup-php@v2
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
           coverage: none
+      - name: Resolve dependencies for this PHPUnit version
+        run: composer update --with-all-dependencies --no-interaction --prefer-dist --with 'phpunit/phpunit:${{ matrix.phpunit }}'
+      - run: composer validate --strict
+      - run: vendor/bin/phpunit
+      - name: Static analysis
+        if: matrix.php == '8.4'
+        run: vendor/bin/phpstan analyse src --level=5 --no-progress
 
-      - name: Install dependencies
-        run: composer install --no-interaction --prefer-dist
-
-      - name: Run tests
-        run: vendor/bin/phpunit
+  laravel-pest:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {php: '8.2', laravel: '^10.0', pest: '^2.0', plugin: '^2.0'}
+          - {php: '8.2', laravel: '^11.0', pest: '^2.0', plugin: '^2.0'}
+          - {php: '8.2', laravel: '^11.0', pest: '^3.0', plugin: '^3.0'}
+          - {php: '8.2', laravel: '^12.0', pest: '^3.0', plugin: '^3.0'}
+          - {php: '8.3', laravel: '^12.0', pest: '^4.0', plugin: '^4.0'}
+          - {php: '8.3', laravel: '^13.0', pest: '^4.0', plugin: '^4.0'}
+          - {php: '8.4', laravel: '^13.0', pest: '^5.0', plugin: '^5.0'}
+    name: Laravel ${{ matrix.laravel }} / Pest ${{ matrix.pest }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+      - run: composer config allow-plugins.pestphp/pest-plugin true
+      - name: Install Laravel and Pest compatibility dependencies
+        run: composer require --dev --no-interaction --prefer-dist --with-all-dependencies 'laravel/framework:${{ matrix.laravel }}' 'pestphp/pest:${{ matrix.pest }}' 'pestphp/pest-plugin-laravel:${{ matrix.plugin }}'
+      - run: vendor/bin/phpunit

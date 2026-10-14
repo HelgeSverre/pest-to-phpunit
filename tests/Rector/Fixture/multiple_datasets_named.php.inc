@@ -17,11 +17,11 @@ class MultipleDatasetsNamedTest extends \PHPUnit\Framework\TestCase
 {
     public static function numbers(): array
     {
-        return [1, 2, 3];
+        return [[1], [2], [3]];
     }
     public static function letters(): array
     {
-        return ['a', 'b', 'c'];
+        return [['a'], ['b'], ['c']];
     }
     #[\PHPUnit\Framework\Attributes\DataProvider('numbers')]
     public function test_uses_numbers(int $n): void

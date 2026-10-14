@@ -15,8 +15,8 @@ class WithNamedDatasetSpecialCharsTest extends \PHPUnit\Framework\TestCase
     public static function user_emails_valid(): array
     {
         return [
-            'test@example.com',
-            'user+tag@domain.org',
+            ['test@example.com'],
+            ['user+tag@domain.org'],
         ];
     }
     #[\PHPUnit\Framework\Attributes\DataProvider('user_emails_valid')]

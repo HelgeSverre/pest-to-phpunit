@@ -25,7 +25,7 @@ class NamespacedWithHooksAndDatasetTest extends \PHPUnit\Framework\TestCase
     protected $cache;
     public static function cache_keys(): array
     {
-        return ['user:1', 'post:42', 'config:app'];
+        return [['user:1'], ['post:42'], ['config:app']];
     }
     protected function setUp(): void
     {

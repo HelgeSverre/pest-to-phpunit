@@ -424,7 +424,7 @@ final class ExpectChainUnwinder
                 if (count($args) >= 1 && $args[0]->value instanceof \PhpParser\Node\Expr\Array_) {
                     $isAssociative = false;
                     foreach ($args[0]->value->items as $item) {
-                        if ($item !== null && $item->key !== null) {
+                        if ($item->key !== null) {
                             $isAssociative = true;
                             break;
                         }
@@ -432,10 +432,11 @@ final class ExpectChainUnwinder
 
                     if ($isAssociative) {
                         foreach ($args[0]->value->items as $item) {
-                            if ($item === null || $item->key === null) {
+                            if ($item->key === null) {
                                 continue;
                             }
-                            $propAccess = new PropertyFetch($currentSubject, new Identifier($item->key->value));
+                            $property = $item->key instanceof String_ ? new Identifier($item->key->value) : $item->key;
+                            $propAccess = new PropertyFetch($currentSubject, $property);
                             $assertMethod = $negated_local ? 'assertNotSame' : 'assertSame';
                             $stmts[] = new Stmt\Expression(
                                 new MethodCall(new Variable('this'), $assertMethod, [new Arg($item->value), new Arg($propAccess)])
@@ -444,9 +445,7 @@ final class ExpectChainUnwinder
                     } else {
                         $phpunitMethod = $negated_local ? 'assertObjectNotHasProperty' : 'assertObjectHasProperty';
                         foreach ($args[0]->value->items as $item) {
-                            if ($item !== null) {
-                                $stmts[] = self::buildAssertion($currentSubject, $phpunitMethod, 'expected_actual', [new Arg($item->value)]);
-                            }
+                            $stmts[] = self::buildAssertion($currentSubject, $phpunitMethod, 'expected_actual', [new Arg($item->value)]);
                         }
                     }
                 }
@@ -459,9 +458,7 @@ final class ExpectChainUnwinder
                 $negated = false;
                 if (count($args) >= 1 && $args[0]->value instanceof \PhpParser\Node\Expr\Array_) {
                     foreach ($args[0]->value->items as $item) {
-                        if ($item !== null) {
-                            $stmts[] = self::buildAssertion($currentSubject, $phpunitMethod, 'expected_actual', [new Arg($item->value)]);
-                        }
+                        $stmts[] = self::buildAssertion($currentSubject, $phpunitMethod, 'expected_actual', [new Arg($item->value)]);
                     }
                 }
                 continue;
@@ -530,19 +527,17 @@ final class ExpectChainUnwinder
                 $negated = false;
                 if (count($args) >= 1 && $args[0]->value instanceof \PhpParser\Node\Expr\Array_) {
                     foreach ($args[0]->value->items as $item) {
-                        if ($item !== null) {
-                            $methodExistsCall = new FuncCall(
-                                new Name('method_exists'),
-                                [new Arg($currentSubject), new Arg($item->value)]
-                            );
-                            $stmts[] = new Stmt\Expression(
-                                new MethodCall(
-                                    new Variable('this'),
-                                    $phpunitMethod,
-                                    [new Arg($methodExistsCall)]
-                                )
-                            );
-                        }
+                        $methodExistsCall = new FuncCall(
+                            new Name('method_exists'),
+                            [new Arg($currentSubject), new Arg($item->value)]
+                        );
+                        $stmts[] = new Stmt\Expression(
+                            new MethodCall(
+                                new Variable('this'),
+                                $phpunitMethod,
+                                [new Arg($methodExistsCall)]
+                            )
+                        );
                     }
                 }
                 continue;

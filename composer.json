@@ -32,9 +32,9 @@
         "ta-tikoma/phpunit-architecture-test": "Required for converted arch() tests to run (provides ArchitectureAsserts trait)"
     },
     "require-dev": {
-        "phpunit/phpunit": "^10.5|^11.0",
+        "phpunit/phpunit": "^10.5 || ^11.0 || ^12.0 || ^13.0",
         "phpstan/phpstan": "^2.0",
-        "symplify/easy-coding-standard": "^12.0"
+        "symplify/easy-coding-standard": "^13.0"
     },
     "autoload": {
         "psr-4": {
@@ -46,7 +46,7 @@
             "HelgeSverre\\PestToPhpUnit\\Tests\\": "tests/"
         }
     },
-    "minimum-stability": "dev",
+    "minimum-stability": "stable",
     "prefer-stable": true,
     "config": {
         "sort-packages": true

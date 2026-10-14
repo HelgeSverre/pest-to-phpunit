@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [v0.0.11] - 2026-10-14
+
+### Compatibility
+- Support PHPUnit 10.5–13 in development dependencies and update ECS to 13.x.
+- Convert modern `pest()->extend(...)->use(...)` configuration, including groups and hooks.
+- Convert imported `Pest\Laravel` helper functions to test-case methods, including aliases, grouped imports, and fully qualified calls.
+- Resolve stable dependencies and document supported versions and conversion limits.
+
+### Bug Fixes
+- Normalize scalar and mixed dataset rows for PHPUnit, including arrow functions, closure returns, and generator yields.
+- Evaluate dynamic dataset rows once without overwriting variables in the original provider scope.
+- Generate the existing `assertFinite()` and `assertInfinite()` PHPUnit methods.
+- Avoid Rector scope-refresh crashes when converting files with Laravel installed.
+- Preserve fully qualified trait names and handle dynamic property names in `toHaveProperties()`.
+- Correct static-analysis types and remove obsolete nullable array-item checks.
+
+### Testing and CI
+- **585 tests** in the full suite; the Laravel-only runtime check is skipped when Laravel is absent and passes in compatibility installs.
+- Execute converted fixtures in PHPUnit to verify provider rows and generated assertions.
+- Add dependency-resolution jobs for PHP 8.1–8.5 / PHPUnit 10–13 and seven Laravel 10–13 / Pest 2–5 combinations.
+- Add PHPStan level 5 analysis to CI and update the checkout action.
+- Correct the README dataset example and assertion documentation.
+
 ## [v0.0.10] - 2026-08-08
 
 ### Bug Fixes

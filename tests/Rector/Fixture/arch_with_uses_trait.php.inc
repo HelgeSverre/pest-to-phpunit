@@ -15,7 +15,7 @@ test('normal test', function () {
 
 class ArchWithUsesTraitTest extends \PHPUnit\Framework\TestCase
 {
-    use Tests\Traits\RefreshDatabase, \PHPUnit\Architecture\ArchitectureAsserts;
+    use \Tests\Traits\RefreshDatabase, \PHPUnit\Architecture\ArchitectureAsserts;
     public function test_models_are_final(): void
     {
         $layer = $this->layer()->leaveByNameStart('App\Models');

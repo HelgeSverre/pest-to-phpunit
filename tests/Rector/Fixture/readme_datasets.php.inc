@@ -16,8 +16,8 @@ class ReadmeDatasetsTest extends \PHPUnit\Framework\TestCase
     public static function emails(): array
     {
         return [
-            'test@example.com',
-            'foo@bar.com',
+            ['test@example.com'],
+            ['foo@bar.com'],
         ];
     }
     #[\PHPUnit\Framework\Attributes\DataProvider('emails')]

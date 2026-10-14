@@ -15,7 +15,7 @@ test('normal test', function () {
 
 class ArchUsesWithArchTest extends \PHPUnit\Framework\TestCase
 {
-    use App\Traits\HasFactory, \PHPUnit\Architecture\ArchitectureAsserts;
+    use \App\Traits\HasFactory, \PHPUnit\Architecture\ArchitectureAsserts;
     public function test_strict_types(): void
     {
         $layer = $this->layer()->leaveByNameStart('App');

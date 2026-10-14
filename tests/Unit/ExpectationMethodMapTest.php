@@ -9,6 +9,16 @@ use PHPUnit\Framework\TestCase;
 
 final class ExpectationMethodMapTest extends TestCase
 {
+    public function test_mapped_assertions_exist_in_phpunit(): void
+    {
+        foreach (ExpectationMethodMap::MAP as [$method]) {
+            $this->assertTrue(method_exists(TestCase::class, $method), "Unknown PHPUnit assertion: {$method}");
+        }
+        foreach (ExpectationMethodMap::NEGATED_MAP as $method) {
+            $this->assertTrue(method_exists(TestCase::class, $method), "Unknown negated PHPUnit assertion: {$method}");
+        }
+    }
+
     public function test_every_map_entry_has_valid_arg_order(): void
     {
         $validArgOrders = ['expected_actual', 'actual_only'];

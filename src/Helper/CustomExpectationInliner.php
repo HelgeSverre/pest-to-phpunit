@@ -527,7 +527,8 @@ final class CustomExpectationInliner
         });
 
         $result = $traverser->traverse([$stmt]);
-        return $result[0] ?? $stmt;
+        $replacement = $result[0] ?? $stmt;
+        return $replacement instanceof Stmt ? $replacement : $stmt;
     }
 
     /**

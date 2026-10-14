@@ -82,7 +82,7 @@ class KitchenSinkTest extends \Tests\TestCase
     protected $admin;
     public static function roles(): array
     {
-        return ['admin', 'editor', 'viewer'];
+        return [['admin'], ['editor'], ['viewer']];
     }
     protected function setUp(): void
     {

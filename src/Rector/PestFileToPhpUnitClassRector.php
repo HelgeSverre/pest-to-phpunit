@@ -60,7 +60,7 @@ final class PestFileToPhpUnitClassRector extends AbstractRector implements Confi
     private const PEST_FUNCTIONS = [
         'test', 'it', 'beforeEach', 'afterEach', 'beforeAll', 'afterAll',
         'uses', 'dataset', 'describe', 'covers', 'coversNothing', 'arch',
-        'expect',
+        'expect', 'pest',
     ];
 
     /** @var array<string, bool> Track which files we've already processed */
@@ -69,6 +69,9 @@ final class PestFileToPhpUnitClassRector extends AbstractRector implements Confi
     private bool $inferNamespace = false;
 
     private bool $hasArchTests = false;
+
+    /** @var array<string, array<string, string>> Laravel helper aliases by file */
+    private array $laravelFunctionAliases = [];
 
     /**
      * @param mixed[] $configuration
@@ -105,29 +108,67 @@ CODE_SAMPLE,
 
     public function getNodeTypes(): array
     {
-        return [Expression::class, Use_::class, GroupUse::class];
+        return [FileNode::class, Use_::class, GroupUse::class];
     }
 
     /**
-     * @return Node|Node[]|null|NodeVisitor::REMOVE_NODE
+     * @return Node|null|NodeVisitor::REMOVE_NODE
      */
     public function refactor(Node $node): mixed
     {
+        if ($node instanceof FileNode) {
+            $stmts = $node->stmts;
+            foreach ($stmts as $stmt) {
+                if ($stmt instanceof Namespace_) {
+                    $stmts = $stmt->stmts;
+                    break;
+                }
+            }
+            // Register imports before converting bodies; child imports have not been visited yet.
+            foreach ($stmts as $stmt) {
+                if ($stmt instanceof Use_ && $stmt->type === Use_::TYPE_FUNCTION) {
+                    foreach ($stmt->uses as $use) {
+                        $this->registerLaravelFunction($use->name->toString(), $use->alias?->toString() ?? $use->name->getLast());
+                    }
+                } elseif ($stmt instanceof GroupUse && $stmt->type === Use_::TYPE_FUNCTION) {
+                    foreach ($stmt->uses as $use) {
+                        $this->registerLaravelFunction($stmt->prefix->toString() . '\\' . $use->name->toString(), $use->alias?->toString() ?? $use->name->getLast());
+                    }
+                }
+            }
+            foreach ($stmts as $stmt) {
+                if ($stmt instanceof Expression && $this->isPestExpression($stmt)) {
+                    $replacement = $this->convertFile($stmt);
+                    if ($replacement !== null) {
+                        // Whole-file replacement: the generated class is not yet available to
+                        // PHPStan's on-disk reflection. Avoid per-expression scope refresh.
+                        $this->file->addRectorClassWithLine(new \Rector\ChangesReporting\ValueObject\RectorWithLineChange(self::class, $stmt->getStartLine()));
+                    }
+                    break;
+                }
+            }
+            return null;
+        }
+
         // Strip `use function Pest\...` imports
         if ($node instanceof Use_ && $node->type === Use_::TYPE_FUNCTION) {
             return $this->refactorPestFunctionUse($node);
         }
         if ($node instanceof GroupUse && $node->type === Use_::TYPE_FUNCTION) {
             if (str_starts_with($node->prefix->toString(), 'Pest\\')) {
+                foreach ($node->uses as $use) {
+                    $this->registerLaravelFunction($node->prefix->toString() . '\\' . $use->name->toString(), $use->alias?->toString() ?? $use->name->getLast());
+                }
                 return NodeVisitor::REMOVE_NODE;
             }
             return null;
         }
 
-        if (! $node instanceof Expression) {
-            return null;
-        }
+        return null;
+    }
 
+    private function convertFile(Expression $node): ?Node
+    {
         if (! $this->isPestExpression($node)) {
             return null;
         }
@@ -136,7 +177,7 @@ CODE_SAMPLE,
 
         // Already processed this file — remove remaining pest expressions
         if (isset($this->processedFiles[$filePath])) {
-            return NodeVisitor::REMOVE_NODE;
+            return null;
         }
 
         // Mark file as processed
@@ -273,11 +314,19 @@ CODE_SAMPLE,
                     }
                     break;
 
+                case 'pest':
                 case 'uses':
                     $this->processUses($rootCall, $extendsClass, $traitUses);
 
                     foreach ($chainModifiers as $modifier) {
                         switch ($modifier['name']) {
+                            case 'extend':
+                            case 'extends':
+                            case 'use':
+                            case 'uses':
+                                $this->processUses(new FuncCall(new Name('uses'), $modifier['args']), $extendsClass, $traitUses);
+                                break;
+
                             case 'beforeEach':
                             case 'afterEach':
                             case 'beforeAll':
@@ -344,10 +393,7 @@ CODE_SAMPLE,
                     break;
 
                 case 'arch':
-                    $method = $this->processArch($rootCall, $chainModifiers);
-                    if ($method !== null) {
-                        $methods[] = $method;
-                    }
+                    $methods[] = $this->processArch($rootCall, $chainModifiers);
                     break;
 
                 case 'expect':
@@ -458,12 +504,7 @@ CODE_SAMPLE,
             $this->file->changeNewStmts($newStmts);
         }
 
-        // Return the replacement for this first pest expression
-        if ($inferredNamespace) {
-            // Return namespace wrapping the class — replaces the pest expression at top level
-            return $namespace;
-        }
-        return $class;
+        return $inferredNamespace ? $namespace : $class;
     }
 
     /** @param list<ClassMethod> $methods @return list<ClassMethod> */
@@ -522,6 +563,18 @@ CODE_SAMPLE,
 
         $funcName = $expr->name instanceof Name ? $expr->name->toString() : null;
 
+        if ($funcName === 'pest') {
+            $modifiers = [];
+            $this->unwrapChain($node->expr, $modifiers);
+            $supported = ['extend', 'extends', 'use', 'uses', 'in', 'group', 'beforeEach', 'afterEach', 'beforeAll', 'afterAll'];
+            foreach ($modifiers as $modifier) {
+                if (! in_array($modifier['name'], $supported, true)) {
+                    return false;
+                }
+            }
+            return $modifiers !== [];
+        }
+
         return $funcName !== null && in_array($funcName, self::PEST_FUNCTIONS, true);
     }
 
@@ -562,7 +615,7 @@ CODE_SAMPLE,
      *
      * @param list<array{name: string, args: list<Arg>}> $chainModifiers
      * @param list<ClassMethod> $dataProviders
-     * @return array{method: ClassMethod, provider?: ClassMethod, providerCounter: int}|null
+     * @return array{method: ClassMethod, providers?: list<ClassMethod>, providerCounter: int}|null
      */
     private function processTestCall(FuncCall $call, string $funcName, array $chainModifiers, array &$dataProviders, int $providerCounter, string $descriptionPrefix = '', array $scopedBeforeEach = [], array $scopedAfterEach = []): ?array
     {
@@ -898,9 +951,7 @@ CODE_SAMPLE,
 
             if ($value instanceof Array_) {
                 foreach ($value->items as $item) {
-                    if ($item !== null) {
-                        $this->processUses(new FuncCall(new Name('uses'), [new Arg($item->value)]), $extendsClass, $traitUses);
-                    }
+                    $this->processUses(new FuncCall(new Name('uses'), [new Arg($item->value)]), $extendsClass, $traitUses);
                 }
                 continue;
             }
@@ -915,7 +966,8 @@ CODE_SAMPLE,
                 if ((class_exists($className) && ! trait_exists($className)) || str_contains($className, 'TestCase')) {
                     $extendsClass = new FullyQualified($className);
                 } else {
-                    $traitUses[] = new Name($className);
+                    $originalName = $value->class->getAttribute('originalName');
+                    $traitUses[] = $originalName instanceof Name ? clone $originalName : new Name($className);
                 }
             } elseif ($value instanceof String_) {
                 $className = $value->value;
@@ -954,8 +1006,13 @@ CODE_SAMPLE,
         if ($dataArg instanceof Closure) {
             // dataset('name', function() { ... }) — use closure body
             $body = $dataArg->stmts ?? [];
+        } elseif ($dataArg instanceof ArrowFunction) {
+            $body = [new Return_($dataArg->expr)];
         } else {
             $body = [new Return_($dataArg)];
+        }
+        foreach ($body as $stmt) {
+            $this->normalizeProviderNode($stmt);
         }
 
         $methodName = $this->sanitizeProviderName($datasetName);
@@ -978,7 +1035,7 @@ CODE_SAMPLE,
      * Process a describe() block by recursively extracting tests.
      *
      * @param list<ClassMethod> $dataProviders
-     * @return list<array{method: ClassMethod, provider?: ClassMethod, providerCounter: int}>
+     * @return list<array{method: ClassMethod, providers?: list<ClassMethod>, providerCounter: int}>
      */
     private function processDescribe(FuncCall $call, string $parentPrefix, array &$dataProviders, int $providerCounter, array $describeModifiers = [], array $scopedBeforeEach = [], array $scopedAfterEach = []): array
     {
@@ -1087,10 +1144,7 @@ CODE_SAMPLE,
                     $providerCounter = $result['providerCounter'];
                 }
             } elseif ($funcName === 'arch') {
-                $method = $this->processArch($rootCall, $chainModifiers);
-                if ($method !== null) {
-                    $results[] = ['method' => $method, 'providerCounter' => $providerCounter];
-                }
+                $results[] = ['method' => $this->processArch($rootCall, $chainModifiers), 'providerCounter' => $providerCounter];
             } elseif ($funcName === 'describe') {
                 $nestedModifiers = array_merge($describeModifiers, $chainModifiers);
                 $nestedResults = $this->processDescribe($rootCall, $prefix, $dataProviders, $providerCounter, $nestedModifiers, array_merge($scopedTodos, $mergedBeforeEach), $mergedAfterEach);
@@ -1129,7 +1183,7 @@ CODE_SAMPLE,
      *
      * @param list<array{name: string, args: list<Arg>}> $chainModifiers
      */
-    private function processArch(FuncCall $call, array $chainModifiers): ?ClassMethod
+    private function processArch(FuncCall $call, array $chainModifiers): ClassMethod
     {
         $descriptionArg = (count($call->args) >= 1 && $call->args[0] instanceof Arg) ? $call->args[0]->value : null;
         $description = $descriptionArg instanceof String_ ? $descriptionArg->value : 'arch test';
@@ -1244,7 +1298,7 @@ CODE_SAMPLE,
         }
 
         // ->with([...]) — inline data
-        if ($firstArg instanceof Array_ || $firstArg instanceof Closure) {
+        if ($firstArg instanceof Array_ || $firstArg instanceof Closure || $firstArg instanceof ArrowFunction) {
             $suffix = $withIndex > 0 ? '_provider_' . ($withIndex + 1) : '_provider';
             // Strip test_ prefix to avoid PHPUnit treating provider as a test method
             $baseName = str_starts_with($testMethodName, 'test_') ? substr($testMethodName, 5) : $testMethodName;
@@ -1254,34 +1308,13 @@ CODE_SAMPLE,
             $body = [];
             if ($firstArg instanceof Closure) {
                 $body = $firstArg->stmts ?? [];
+            } elseif ($firstArg instanceof ArrowFunction) {
+                $body = [new Return_($firstArg->expr)];
             } else {
-                // Check if items need wrapping for PHPUnit data providers
-                // Pest wraps scalar values: is_array($v) ? $v : [$v]
-                $needsWrapping = true;
-                foreach ($firstArg->items as $item) {
-                    if ($item !== null && $item->value instanceof Array_) {
-                        $needsWrapping = false;
-                        break;
-                    }
-                }
-
-                if ($needsWrapping && $firstArg->items !== []) {
-                    $wrappedItems = [];
-                    foreach ($firstArg->items as $item) {
-                        if ($item !== null) {
-                            $wrappedItems[] = new \PhpParser\Node\ArrayItem(
-                                new Array_(
-                                    [new \PhpParser\Node\ArrayItem($item->value)],
-                                    ['kind' => Array_::KIND_SHORT]
-                                ),
-                                $item->key
-                            );
-                        }
-                    }
-                    $firstArg = new Array_($wrappedItems, ['kind' => Array_::KIND_SHORT]);
-                }
-
                 $body = [new Return_($firstArg)];
+            }
+            foreach ($body as $stmt) {
+                $this->normalizeProviderNode($stmt);
             }
 
             $returnType = ($firstArg instanceof Closure && $this->containsYield($body))
@@ -1308,6 +1341,71 @@ CODE_SAMPLE,
         }
 
         return null;
+    }
+
+    private function normalizeProviderNode(Node $node): void
+    {
+        if ($node instanceof Closure || $node instanceof ArrowFunction) {
+            return;
+        }
+        if ($node instanceof Return_ && $node->expr instanceof Array_) {
+            $node->expr = $this->normalizeDatasetArray($node->expr);
+            return;
+        }
+        if ($node instanceof Yield_ && $node->value !== null) {
+            $node->value = $this->normalizeDatasetRow($node->value);
+            return;
+        }
+        foreach ($node->getSubNodeNames() as $name) {
+            $children = is_array($node->$name) ? $node->$name : [$node->$name];
+            foreach ($children as $child) {
+                if ($child instanceof Node) {
+                    $this->normalizeProviderNode($child);
+                }
+            }
+        }
+    }
+
+    private function normalizeDatasetRow(Expr $value): Expr
+    {
+        if ($value instanceof Array_) {
+            return $value;
+        }
+        $wrapped = new Array_([new \PhpParser\Node\ArrayItem($value)], ['kind' => Array_::KIND_SHORT]);
+        if ($value instanceof \PhpParser\Node\Scalar
+            || ($value instanceof Expr\ConstFetch && in_array(strtolower($value->name->toString()), ['true', 'false', 'null'], true))) {
+            return $wrapped;
+        }
+
+        // An expression may produce an array row or a scalar. Evaluate it once
+        // without overwriting a variable in the original provider's scope.
+        $row = new Variable('__pest_dataset_row');
+        $normalizer = new ArrowFunction([
+            'static' => true,
+            'params' => [new Param($row)],
+            'expr' => new Expr\Ternary(
+                new FuncCall(new Name('is_array'), [new Arg(new Variable('__pest_dataset_row'))]),
+                new Variable('__pest_dataset_row'),
+                new Array_([new \PhpParser\Node\ArrayItem(new Variable('__pest_dataset_row'))], ['kind' => Array_::KIND_SHORT])
+            ),
+        ]);
+        return new FuncCall($normalizer, [new Arg($value)]);
+    }
+
+    /**
+     * PHPUnit requires every data-provider row to be an array; Pest also accepts scalars.
+     */
+    private function normalizeDatasetArray(Array_ $data): Array_
+    {
+        foreach ($data->items as $item) {
+            if ($item->value instanceof Array_ || $item->unpack) {
+                continue;
+            }
+
+            $item->value = $this->normalizeDatasetRow($item->value);
+        }
+
+        return $data;
     }
 
     /**
@@ -1382,8 +1480,8 @@ CODE_SAMPLE,
             $result[] = $stmt;
         }
 
-        // Rewrite fake() calls to \Faker\Factory::create()
-        $result = array_map(fn (Stmt $s) => $this->transformFakeCallsInStmt($s), $result);
+        // Rewrite Faker and Laravel helper calls
+        $result = array_map(fn (Stmt $s) => $this->transformPestCallsInStmt($s), $result);
 
         return $result;
     }
@@ -1571,6 +1669,7 @@ CODE_SAMPLE,
     {
         $filtered = [];
         foreach ($node->uses as $use) {
+            $this->registerLaravelFunction($use->name->toString(), $use->alias?->toString() ?? $use->name->getLast());
             if (! str_starts_with($use->name->toString(), 'Pest\\')) {
                 $filtered[] = $use;
             }
@@ -1588,37 +1687,64 @@ CODE_SAMPLE,
         return null;
     }
 
-    /**
-     * Recursively rewrite fake() calls to \Faker\Factory::create() in a statement.
-     */
-    private function transformFakeCallsInStmt(Stmt $stmt): Stmt
+    private function registerLaravelFunction(string $name, string $alias): void
     {
-        $this->transformFakeCallsInNode($stmt);
+        if (str_starts_with($name, 'Pest\\Laravel\\')) {
+            $this->laravelFunctionAliases[$this->file->getFilePath()][$alias] = substr($name, strlen('Pest\\Laravel\\'));
+        }
+    }
+
+    private function convertPestFunction(FuncCall $call): Expr
+    {
+        if ($this->isFakeCall($call)) {
+            return $this->buildFakerFactoryCreate($call);
+        }
+
+        if (! $call->name instanceof Name) {
+            return $call;
+        }
+
+        $name = $call->name->toString();
+        $method = str_starts_with($name, 'Pest\\Laravel\\')
+            ? substr($name, strlen('Pest\\Laravel\\'))
+            : ($call->name->isUnqualified() ? ($this->laravelFunctionAliases[$this->file->getFilePath()][$name] ?? null) : null);
+
+        return $method !== null ? new MethodCall(new Variable('this'), $method, $call->args) : $call;
+    }
+
+    /**
+     * Recursively rewrite Pest helper calls in a statement.
+     */
+    private function transformPestCallsInStmt(Stmt $stmt): Stmt
+    {
+        $this->transformPestCallsInNode($stmt);
 
         return $stmt;
     }
 
     /**
-     * Recursively find and rewrite fake() FuncCall nodes in-place.
+     * Recursively find and rewrite Pest helper calls in-place.
      */
-    private function transformFakeCallsInNode(Node $node): void
+    private function transformPestCallsInNode(Node $node): void
     {
         foreach ($node->getSubNodeNames() as $name) {
             $subNode = $node->$name;
 
             if ($subNode instanceof Node) {
-                if ($subNode instanceof FuncCall && $this->isFakeCall($subNode)) {
-                    $node->$name = $this->buildFakerFactoryCreate($subNode);
+                if ($subNode instanceof FuncCall) {
+                    $this->transformPestCallsInNode($subNode);
+                    $node->$name = $this->convertPestFunction($subNode);
                 } else {
-                    $this->transformFakeCallsInNode($subNode);
+                    $this->transformPestCallsInNode($subNode);
                 }
             } elseif (is_array($subNode)) {
                 foreach ($subNode as $key => $item) {
                     if ($item instanceof Node) {
-                        if ($item instanceof FuncCall && $this->isFakeCall($item)) {
-                            $node->$name[$key] = $this->buildFakerFactoryCreate($item);
+                        if ($item instanceof FuncCall) {
+                            $this->transformPestCallsInNode($item);
+                            $node->$name[$key] = $this->convertPestFunction($item);
                         } else {
-                            $this->transformFakeCallsInNode($item);
+                            $this->transformPestCallsInNode($item);
                         }
                     }
                 }
